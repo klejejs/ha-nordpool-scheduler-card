@@ -1,0 +1,42 @@
+# Example Lovelace Dashboard Configuration
+# Copy this to your Home Assistant configuration
+
+views:
+  - title: Nordpool Scheduler
+    path: nordpool
+    icon: mdi:calendar-clock
+    cards:
+      # Full-featured card
+      - type: custom:nordpool-scheduler-card
+        entity: sensor.nordpool_scheduler_electricity_price
+        name: Kitchen Appliances
+        show_name: true
+        show_prices: true
+        compact_view: false
+
+      # Compact version
+      - type: custom:nordpool-scheduler-card
+        entity: sensor.nordpool_scheduler_electricity_price
+        name: Water Heater
+        show_name: true
+        show_prices: true
+        compact_view: true
+
+      # Minimal version (no name, no prices)
+      - type: custom:nordpool-scheduler-card
+        entity: sensor.nordpool_scheduler_electricity_price
+        show_name: false
+        show_prices: false
+        compact_view: true
+
+      # Side-by-side layout
+      - type: horizontal-stack
+        cards:
+          - type: custom:nordpool-scheduler-card
+            entity: sensor.nordpool_scheduler_electricity_price
+            name: Device 1
+            compact_view: true
+          - type: custom:nordpool-scheduler-card
+            entity: sensor.nordpool_scheduler_electricity_price
+            name: Device 2
+            compact_view: true

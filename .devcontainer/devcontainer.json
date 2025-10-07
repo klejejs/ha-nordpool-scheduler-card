@@ -1,0 +1,30 @@
+{
+  "name": "Nordpool Scheduler Card Development",
+  "image": "node:20-bookworm",
+  "forwardPorts": [5000, 8123],
+  "portsAttributes": {
+    "5000": {
+      "label": "Development Server",
+      "onAutoForward": "notify"
+    },
+    "8123": {
+      "label": "Home Assistant",
+      "onAutoForward": "ignore"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml",
+        "visualstudioexptteam.vscodeintellicode"
+      ]
+    }
+  },
+  "remoteUser": "node",
+  "remoteEnv": {
+    "NPM_CONFIG_PREFIX": "/home/node/.npm-global"
+  }
+}

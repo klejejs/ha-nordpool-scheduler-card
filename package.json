@@ -1,0 +1,48 @@
+{
+  "name": "nordpool-scheduler-card",
+  "version": "1.0.0",
+  "description": "A custom Home Assistant Lovelace card for Nordpool price-based scheduling",
+  "main": "dist/nordpool-scheduler-card.js",
+  "scripts": {
+    "start": "rollup -c --watch",
+    "build": "rollup -c",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "packageManager": "yarn@1.22.22",
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "custom-card",
+    "nordpool",
+    "scheduler"
+  ],
+  "author": "@klejejs",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-json": "^6.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.0.3",
+    "rollup": "^4.1.0",
+    "rollup-plugin-serve": "^2.0.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "custom-card-helpers": "^1.9.0",
+    "home-assistant-js-websocket": "^8.2.0",
+    "lit": "^3.0.0"
+  }
+}
