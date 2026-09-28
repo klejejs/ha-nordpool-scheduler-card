@@ -1,602 +1,329 @@
-import { LitElement, html, TemplateResult, PropertyValues } from 'lit';
+import { LitElement, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import { HomeAssistant, LovelaceCardEditor, hasConfigOrEntityChanged } from 'custom-card-helpers';
+import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
-import {
-  NordpoolSchedulerCardConfig,
-  NordpoolSensorAttributes,
-  TimeSlot,
+import type {
   HistorySegment,
-  HistoryState,
+  HistoryStreamMessage,
+  HomeAssistant,
+  LovelaceCard,
+  LovelaceConfigForm,
+  LovelaceGridOptions,
+  NordpoolSchedulerCardConfig,
+  RenderSlot,
+  ScheduleSnapshot,
+  SetSlotState,
 } from './types';
 import {
-  generateTimeSlots,
-  getCurrentSlotIndex,
-  getPriceColor,
-  formatPrice,
-  groupSlotsByHour,
+  buildRenderSlots,
   calculatePriceStats,
-} from './utils';
+  formatDayHeading,
+  formatPrice,
+  localDateKey,
+  nextSlotState,
+  priceTier,
+} from './format';
+import { HistoryAccumulator } from './history';
 import { sharedStyles } from './styles';
 
+const VERSION = '2.0.0';
 console.info(
-  '%c NORDPOOL-SCHEDULER-CARD %c v1.0.0 ',
+  `%c NORDPOOL-SCHEDULER-CARD %c v${VERSION} `,
   'color: white; background: #03a9f4; font-weight: 700;',
   'color: #03a9f4; background: white; font-weight: 700;'
 );
 
-export class NordpoolSchedulerCard extends LitElement {
-  @property({ attribute: false }) public hass?: HomeAssistant;
-  @state() private _config?: NordpoolSchedulerCardConfig;
-  @state() private _selectedSlots: Set<number> = new Set();
-  @state() private _historySegments: HistorySegment[] = [];
-  @state() private _activeTab: 'today' | 'tomorrow' = 'today';
-  @state() private _optimisticDate?: string; // Track which date has optimistic changes
-  private _updateInterval?: number;
+const HISTORY_HOURS = 24;
 
-  // Public getter for config (required by custom-card-helpers)
-  public get config(): NordpoolSchedulerCardConfig | undefined {
-    return this._config;
+export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
+  @property({ attribute: false }) public hass?: HomeAssistant;
+
+  @state() private _config?: NordpoolSchedulerCardConfig;
+
+  @state() private _data?: ScheduleSnapshot;
+
+  @state() private _error?: string;
+
+  @state() private _actionError?: string;
+
+  @state() private _activeDate?: string;
+
+  @state() private _historySegments: HistorySegment[] = [];
+
+  private _pending = new Map<string, SetSlotState>();
+
+  private _subscribedEntity?: string;
+
+  private _unsubscribe?: UnsubscribeFunc;
+
+  private _historyEntity?: string;
+
+  private _unsubscribeHistory?: UnsubscribeFunc;
+
+  private _historyAccumulator = new HistoryAccumulator();
+
+  public static getStubConfig(hass: HomeAssistant): NordpoolSchedulerCardConfig {
+    const entity = Object.keys(hass.states).find(
+      (id) => id.startsWith('sensor.') && hass.states[id].attributes.vat_percent !== undefined
+    );
+    return { type: 'custom:nordpool-scheduler-card', entity: entity ?? '', show_name: true };
   }
 
-  public connectedCallback(): void {
-    super.connectedCallback();
-    this._startUpdateTimer();
+  public static getConfigForm(): LovelaceConfigForm {
+    return {
+      schema: [
+        {
+          name: 'entity',
+          required: true,
+          selector: { entity: { filter: { integration: 'nordpool_scheduler', domain: 'sensor' } } },
+        },
+        { name: 'name', selector: { text: {} } },
+        { name: 'show_name', selector: { boolean: {} } },
+        { name: 'show_day_tabs', selector: { boolean: {} } },
+        { name: 'show_history', selector: { boolean: {} } },
+        {
+          name: 'history_entity',
+          selector: {
+            entity: { filter: { integration: 'nordpool_scheduler', domain: 'binary_sensor' } },
+          },
+        },
+        {
+          name: 'price_unit',
+          selector: {
+            select: {
+              mode: 'dropdown',
+              options: [
+                { value: 'cents', label: 'Cents' },
+                { value: 'currency', label: 'Currency' },
+              ],
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  public getGridOptions(): LovelaceGridOptions {
+    return { columns: 12, min_columns: 6, rows: 'auto' };
+  }
+
+  public getCardSize(): number {
+    return 6;
+  }
+
+  public setConfig(config: NordpoolSchedulerCardConfig): void {
+    if (!config?.entity) {
+      throw new Error('Entity must be specified');
+    }
+    this._config = { show_name: true, show_history: true, price_unit: 'cents', ...config };
   }
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
-    if (this._updateInterval) {
-      clearInterval(this._updateInterval);
-      this._updateInterval = undefined;
-    }
+    this._unsubscribe?.();
+    this._unsubscribe = undefined;
+    this._subscribedEntity = undefined;
+    this._unsubscribeHistory?.();
+    this._unsubscribeHistory = undefined;
+    this._historyEntity = undefined;
   }
 
-  private _startUpdateTimer(): void {
-    // Calculate milliseconds until the next minute boundary
-    const now = new Date();
-    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-
-    // Wait until the next minute, then update every minute exactly
-    setTimeout(() => {
-      this.requestUpdate();
-      // Now set up the regular interval to fire at the start of each minute
-      this._updateInterval = window.setInterval(() => {
-        this.requestUpdate();
-      }, 60000);
-    }, msUntilNextMinute);
-  }
-
-  public static async getConfigElement(): Promise<LovelaceCardEditor> {
-    await import('./nordpool-scheduler-card-editor');
-    return document.createElement('nordpool-scheduler-card-editor');
-  }
-
-  public static getStubConfig(): NordpoolSchedulerCardConfig {
-    console.log('🎯 getStubConfig called - HA found the card!');
-    return {
-      type: 'custom:nordpool-scheduler-card',
-      entity: '',
-      name: 'Nordpool Scheduler',
-      show_name: true,
-      show_day_selector: false,
-      compact_view: false,
-    };
-  }
-
-  public setConfig(config: NordpoolSchedulerCardConfig): void {
-    if (!config) {
-      console.warn('⚠️ nordpool-scheduler-card: No config provided, using defaults');
-      config = {
-        type: 'custom:nordpool-scheduler-card',
-      };
-    }
-
-    this._config = {
-      show_name: true,
-      show_day_selector: false,
-      compact_view: false,
-      show_history: true,
-      ...config,
-    };
-  }
-
-  protected shouldUpdate(changedProps: PropertyValues): boolean {
-    if (!this._config) {
-      return false;
-    }
-
-    return hasConfigOrEntityChanged(this, changedProps, false);
-  }
-
-  protected updated(changedProps: PropertyValues) {
-    super.updated(changedProps);
-
-    // Sync local state with backend when entity state changes
-    if (changedProps.has('hass') && this.hass && this._config?.entity) {
-      const oldHass = changedProps.get('hass');
-      const newState = this.hass.states[this._config.entity];
-      const oldState = oldHass?.states[this._config.entity];
-
-      if (!newState) {
-        console.error('❌ Entity not found:', this._config.entity);
-        console.log(
-          'Available entities:',
-          Object.keys(this.hass.states).filter((e) => e.includes('nordpool'))
-        );
-        return;
-      }
-
-      // Get entry_id from attributes
-      const attributes = newState?.attributes as unknown as NordpoolSensorAttributes;
-      const entryId = attributes?.entry_id;
-
-      // Debug: Log entity state and attributes
-      if (!entryId) {
-        console.error('❌ entry_id not found in entity attributes');
-        console.log('Entity:', this._config.entity);
-        console.log('State:', newState.state);
-        console.log('All attributes:', attributes);
-        console.log('Available attribute keys:', Object.keys(attributes || {}));
-      }
-
-      // Only update if the scheduled_overrides actually changed in the backend
-      if (newState && oldState) {
-        const newAttrs = newState.attributes as unknown as NordpoolSensorAttributes;
-        const oldAttrs = oldState.attributes as unknown as NordpoolSensorAttributes;
-
-        if (
-          newAttrs.scheduled_overrides_count !== oldAttrs.scheduled_overrides_count ||
-          newAttrs.last_update !== oldAttrs.last_update
-        ) {
-          // Backend state changed - fetch from service
-          this._fetchSchedule(entryId);
-        }
-      } else if (newState && !oldState) {
-        // Initial load - fetch from service
-        this._fetchSchedule(entryId);
-
-        // Fetch history if enabled
-        if (this._config.show_history !== false) {
-          // Use configured history_entity or fall back to target_entity from attributes
-          const targetEntity = this._config.history_entity || attributes?.target_entity;
-          console.log('🔍 Target entity for history:', {
-            configured_history_entity: this._config.history_entity,
-            backend_target_entity: attributes?.target_entity,
-            backend_target_entity_state: attributes?.target_entity_state,
-            final_target_entity: targetEntity,
-            all_attributes: Object.keys(attributes || {}),
-          });
-          if (targetEntity) {
-            this._fetchHistory(targetEntity);
-          } else {
-            console.warn(
-              '⚠️ No target_entity found. Please configure "history_entity" in card settings to show history.'
-            );
-          }
-        }
-      }
-    }
-  }
-
-  private async _fetchSchedule(entryId: string | undefined) {
-    if (!entryId || !this.hass || !this._config) {
-      console.warn('⚠️ Cannot fetch schedule: missing requirements');
+  protected updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (!this.hass || !this._config?.entity) {
       return;
     }
+    if (this._subscribedEntity !== this._config.entity) {
+      this._subscribe();
+    }
+    if (this._data && this._config.show_history) {
+      this._ensureHistorySubscription();
+    }
+  }
 
-    try {
-      // Call service with WebSocket directly to request response
-      const conn = (this.hass as any).connection;
-      if (!conn || !conn.sendMessagePromise) {
-        throw new Error('WebSocket connection not available');
+  private _subscribe(): void {
+    this._unsubscribe?.();
+    this._unsubscribe = undefined;
+    this._data = undefined;
+    this._error = undefined;
+    const entityId = this._config!.entity!;
+    this._subscribedEntity = entityId;
+    this.hass!.connection.subscribeMessage<ScheduleSnapshot>((data) => this._onSnapshot(data), {
+      type: 'nordpool_scheduler/subscribe',
+      entity_id: entityId,
+    })
+      .then((unsub) => {
+        this._unsubscribe = unsub;
+      })
+      .catch((err: unknown) => {
+        this._error = errorMessage(err);
+      });
+  }
+
+  private _onSnapshot(data: ScheduleSnapshot): void {
+    this._error = undefined;
+    this._data = data;
+    for (const [start, requested] of this._pending) {
+      const slot = data.slots.find((s) => s.start === start);
+      if (!slot) {
+        this._pending.delete(start);
+        continue;
       }
+      const confirmed =
+        requested === 'default' ? slot.override === null : slot.override === requested;
+      if (confirmed) {
+        this._pending.delete(start);
+      }
+    }
+    const dateKeys = availableDateKeys(data);
+    if (!this._activeDate || !dateKeys.includes(this._activeDate)) {
+      this._activeDate = localDateKey(data.now_slot_start, data.time_zone);
+    }
+  }
 
-      const response = await conn.sendMessagePromise({
-        type: 'call_service',
-        domain: 'nordpool_scheduler',
-        service: 'get_schedule',
-        service_data: {
-          entry_id: entryId,
+  private _ensureHistorySubscription(): void {
+    if (!this._data || !this.hass) {
+      return;
+    }
+    const entityId = this._config?.history_entity || this._data.target_entity;
+    if (this._historyEntity === entityId) {
+      return;
+    }
+    this._unsubscribeHistory?.();
+    this._historyEntity = entityId;
+    this._historyAccumulator = new HistoryAccumulator();
+    this._historySegments = [];
+    const startTime = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000);
+    this.hass.connection
+      .subscribeMessage<HistoryStreamMessage>(
+        (msg) => {
+          this._historyAccumulator.addMessage(msg, entityId, HISTORY_HOURS);
+          this._historySegments = this._historyAccumulator.segments();
         },
-        return_response: true,
-      });
-
-      console.log('📥 Fetched schedule from service:', response);
-      console.log('📥 Response structure:', {
-        hasResponse: !!response.response,
-        responseType: typeof response.response,
-        responseKeys: response.response ? Object.keys(response.response) : 'none',
-        responseValue: response.response,
-      });
-
-      // Update local state from service response
-      if (response && response.response && typeof response.response === 'object') {
-        // NEW: Backend now returns grouped by date: { schedule: { "2025-10-07": { 0: true, 4: true }, "2025-10-08": {...} } }
-        const scheduleData =
-          'schedule' in response.response ? response.response.schedule : response.response;
-
-        console.log('📊 Parsed schedule data:', {
-          scheduleDataType: typeof scheduleData,
-          scheduleDataKeys: scheduleData ? Object.keys(scheduleData) : 'none',
-          scheduleDataSample: scheduleData,
-        });
-
-        // Don't flatten the schedule - the backend returns date-grouped data
-        // We should NOT store it in _selectedSlots as that's only for optimistic updates
-        // The render method will read directly from attributes.scheduled_overrides
-        // Just clear any optimistic state since we have fresh backend data
-        this._selectedSlots = new Set();
-        this._optimisticDate = undefined;
-        console.log('🔄 Synced state from service:', {
-          count: this._selectedSlots.size,
-          slots: Array.from(this._selectedSlots)
-            .sort((a, b) => a - b)
-            .slice(0, 10),
-        });
-        this.requestUpdate();
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch schedule:', err);
-      // Fallback to sensor attributes if service call fails
-      if (this._config?.entity) {
-        const state = this.hass?.states[this._config.entity];
-        const attributes = state?.attributes as unknown as NordpoolSensorAttributes;
-        const scheduledOverrides = attributes?.scheduled_overrides || [];
-        this._selectedSlots = new Set(scheduledOverrides.map((o) => o.slot));
-        this.requestUpdate();
-      }
-    }
-  }
-
-  private async _fetchHistory(targetEntityId: string | undefined) {
-    if (!targetEntityId || !this.hass) {
-      console.warn('⚠️ Cannot fetch history: missing requirements', {
-        targetEntityId,
-        hasHass: !!this.hass,
-      });
-      return;
-    }
-
-    console.log('📊 Fetching history for entity:', targetEntityId);
-
-    try {
-      const now = new Date();
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-      const conn = (this.hass as any).connection;
-      if (!conn || !conn.sendMessagePromise) {
-        throw new Error('WebSocket connection not available');
-      }
-
-      // Validate entity ID format
-      if (!targetEntityId.includes('.')) {
-        console.error('❌ Invalid entity ID format:', targetEntityId);
-        return;
-      }
-
-      // Check if entity exists
-      if (!this.hass.states[targetEntityId]) {
-        console.error('❌ Entity not found in hass.states:', targetEntityId);
-        console.log(
-          'Available similar entities:',
-          Object.keys(this.hass.states)
-            .filter((e) => e.includes(targetEntityId.split('.')[0]))
-            .slice(0, 5)
-        );
-        return;
-      }
-
-      console.log('✅ Entity exists, fetching history...');
-
-      const response = await conn.sendMessagePromise({
-        type: 'history/history_during_period',
-        start_time: yesterday.toISOString(),
-        end_time: now.toISOString(),
-        entity_ids: [targetEntityId],
-        significant_changes_only: false,
-      });
-
-      console.log('📥 History API Response:', {
-        response,
-        isArray: Array.isArray(response),
-        responseType: typeof response,
-        responseKeys: response ? Object.keys(response) : 'null',
-      });
-
-      // Response can be either an array or an object with entity ID as key
-      let history: HistoryState[] | undefined;
-
-      if (Array.isArray(response) && response[0]) {
-        // Old format: array with first element being the history
-        history = response[0] as HistoryState[];
-      } else if (response && typeof response === 'object') {
-        // New format: object with entity ID as key
-        const entityKey = Object.keys(response)[0];
-        if (entityKey && response[entityKey]) {
-          history = response[entityKey] as HistoryState[];
+        {
+          type: 'history/stream',
+          entity_ids: [entityId],
+          start_time: startTime.toISOString(),
+          minimal_response: true,
+          no_attributes: true,
+          significant_changes_only: false,
         }
-      }
-
-      if (history && Array.isArray(history) && history.length > 0) {
-        console.log('📜 History data:', {
-          historyLength: history.length,
-          firstItem: history[0],
-        });
-
-        const segments: HistorySegment[] = [];
-
-        for (let i = 0; i < history.length; i++) {
-          const current = history[i];
-          const next = history[i + 1];
-
-          // Access state - it might be in 's' property or 'state' property
-          const state = (current as any).s || current.state;
-          const lastChanged = (current as any).lu
-            ? new Date((current as any).lu * 1000)
-            : new Date(current.last_changed);
-
-          const start = lastChanged;
-          const end = next
-            ? (next as any).lu
-              ? new Date((next as any).lu * 1000)
-              : new Date(next.last_changed)
-            : now;
-          const duration = end.getTime() - start.getTime();
-
-          segments.push({
-            state: state,
-            start,
-            end,
-            duration,
-          });
-        }
-
-        this._historySegments = segments;
-        console.log('📊 Fetched history:', {
-          entity: targetEntityId,
-          segments: segments.length,
-          sample: segments.slice(0, 3),
-        });
-        this.requestUpdate();
-      } else {
-        console.warn('⚠️ No history data received or empty', {
-          response,
-          history,
-        });
-      }
-    } catch (err: any) {
-      console.error('❌ Failed to fetch history:', {
-        entity: targetEntityId,
-        error: err,
-        message: err?.message,
-        code: err?.code,
+      )
+      .then((unsub) => {
+        this._unsubscribeHistory = unsub;
+      })
+      .catch(() => {
+        // History is a nice-to-have; leave the bar empty on failure.
       });
-    }
   }
 
-  private _getTodayDate(): string {
-    // Use local date, not UTC
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  private _getTomorrowDate(): string {
-    // Use local date, not UTC
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  private _handleSlotClick(slot: TimeSlot): void {
-    // Don't allow clicking on past slots
-    if (slot.isPast) {
+  private _onSlotClick(slot: RenderSlot): void {
+    if (slot.isPast || !this._data || !this.hass) {
       return;
     }
-
-    if (!this.hass || !this._config?.entity) return;
-
-    const stateObj = this.hass.states[this._config.entity];
-    if (!stateObj) {
-      console.error('❌ Entity not found:', this._config.entity);
+    const raw = this._data.slots.find((s) => s.start === slot.start);
+    if (!raw) {
       return;
     }
-
-    const attributes = stateObj.attributes as unknown as NordpoolSensorAttributes;
-    const entryId = attributes.entry_id;
-
-    if (!entryId) {
-      console.error('❌ entry_id not found in entity attributes. Cannot update schedule.');
-      console.log('Entity:', this._config.entity);
-      console.log('State:', stateObj.state);
-      console.log('All attributes:', attributes);
-      console.log('Available attribute keys:', Object.keys(attributes || {}));
-      return;
-    }
-
-    // Determine target date based on mode
-    let targetDate: string;
-    if (this._config.show_day_tabs) {
-      // Day tabs mode: explicit date based on active tab
-      const todayDate = this._getTodayDate();
-      const tomorrowDate = this._getTomorrowDate();
-      targetDate = this._activeTab === 'tomorrow' ? tomorrowDate : todayDate;
-      console.log('📅 Date calculation (day tabs):', {
-        today: todayDate,
-        tomorrow: tomorrowDate,
-        activeTab: this._activeTab,
-        selectedDate: targetDate,
-      });
-    } else {
-      // Single view mode: rolling window logic
-      // Slots >= currentSlot are today, slots < currentSlot are tomorrow
-      const currentSlot = attributes.current_slot ?? 0;
-      const todayDate = this._getTodayDate();
-      const tomorrowDate = this._getTomorrowDate();
-      targetDate = slot.index >= currentSlot ? todayDate : tomorrowDate;
-      console.log('📅 Date calculation (rolling window):', {
-        today: todayDate,
-        tomorrow: tomorrowDate,
-        slotIndex: slot.index,
-        currentSlot,
-        selectedDate: targetDate,
-      });
-    }
-
-    // Determine if slot should be enabled or disabled
-    const isCurrentlySelected = slot.isSelected;
-    const newEnabledState = !isCurrentlySelected;
-
-    console.log('🔄 Slot click - Current state:', {
-      slotIndex: slot.index,
-      time: slot.time,
-      isCurrentlySelected,
-      newEnabledState,
-      targetDate,
-    });
-
-    // Update local state immediately for instant UI feedback (optimistic update)
-    // Start with current backend state for this date, then apply the change
-    const currentBackendSlots = new Set(
-      (attributes.scheduled_overrides || []).filter((o) => o.date === targetDate).map((o) => o.slot)
-    );
-
-    console.log('📦 Backend slots for date:', {
-      targetDate,
-      count: currentBackendSlots.size,
-      slots: Array.from(currentBackendSlots).sort((a, b) => a - b),
-    });
-
-    const newSelectedSlots = new Set(currentBackendSlots);
-    if (newEnabledState) {
-      newSelectedSlots.add(slot.index);
-    } else {
-      newSelectedSlots.delete(slot.index);
-    }
-
-    console.log('✨ New optimistic state:', {
-      count: newSelectedSlots.size,
-      slots: Array.from(newSelectedSlots).sort((a, b) => a - b),
-    });
-
-    this._selectedSlots = newSelectedSlots;
-    this._optimisticDate = targetDate; // Track which date has optimistic changes
+    const requested = nextSlotState(raw, this._pending.get(slot.start), this._data.default_state);
+    this._pending.set(slot.start, requested);
     this.requestUpdate();
 
-    // Call set_slot service to toggle individual slot
-    const serviceData = {
-      entry_id: entryId,
-      slot_index: slot.index,
-      enabled: newEnabledState,
-      date: targetDate,
-    };
-
-    console.log('🎯 Calling set_slot service:', {
-      slot_index: slot.index,
-      time: slot.time,
-      enabled: newEnabledState,
-      date: targetDate,
-      mode: this._config.show_day_tabs ? 'day-tabs' : 'rolling-window',
-      activeTab: this._config.show_day_tabs ? this._activeTab : 'N/A',
-      serviceData,
-    });
-
     this.hass
-      .callService('nordpool_scheduler', 'set_slot', serviceData)
-      .then(async () => {
-        console.log(
-          `✅ Slot ${slot.index} (${slot.time}) set to ${newEnabledState ? 'enabled' : 'disabled'} for ${targetDate}`
-        );
-        // Clear optimistic state and fetch fresh schedule
-        this._optimisticDate = undefined;
-        await this._fetchSchedule(entryId);
+      .callService('nordpool_scheduler', 'set_slots', {
+        config_entry: this._data.config_entry_id,
+        slots: [{ start: slot.start, state: requested }],
       })
-      .catch((err) => {
-        console.error('❌ Service call failed:', err);
-        console.error('Error details:', {
-          message: err.message,
-          code: err.code,
-          error: err,
-        });
-
-        // Revert optimistic update on error - restore backend state for this date
-        const oldOverrides = (attributes.scheduled_overrides || [])
-          .filter((o) => o.date === targetDate)
-          .map((o) => o.slot);
-        this._selectedSlots = new Set(oldOverrides);
-        this._optimisticDate = undefined;
+      .catch((err: unknown) => {
+        this._pending.delete(slot.start);
+        this._actionError = `Could not update ${slot.time}: ${errorMessage(err)}`;
         this.requestUpdate();
-
-        // Show error to user
-        alert(
-          `Failed to update slot ${slot.time}: ${err.message || 'Unknown error'}\n\nCheck browser console and Home Assistant logs for details.`
-        );
       });
   }
 
-  private _renderSlot(
-    slot: TimeSlot,
-    minPrice: number,
-    maxPrice: number,
-    avgPrice: number
-  ): TemplateResult {
-    const color = getPriceColor(slot.price, minPrice, maxPrice, avgPrice);
-    const classList = [
-      'time-slot',
-      slot.isSelected ? 'selected' : '',
-      slot.isCurrentTime ? 'current' : '',
-      slot.isTomorrow ? 'tomorrow' : '',
-      slot.isPast ? 'past' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
+  protected render(): TemplateResult {
+    if (!this._config || !this.hass) {
+      return html``;
+    }
+    if (this._error) {
+      return html`<ha-card
+        >${this._renderHeader()}
+        <ha-alert alert-type="error">Entity "${this._config.entity}" is unavailable.</ha-alert>
+      </ha-card>`;
+    }
+    if (!this._data) {
+      return html`<ha-card>${this._renderHeader()}</ha-card>`;
+    }
+
+    const showTabs = this._config.show_day_tabs ?? false;
+    const dateKeys = availableDateKeys(this._data);
+    const visibleDates = showTabs && this._activeDate ? [this._activeDate] : dateKeys;
+    const scheduledCount = this._data.slots.filter(
+      (s) =>
+        (this._pending.get(s.start) ?? (s.override !== null ? s.override : 'default')) !== 'default'
+    ).length;
+    const todaySlots = buildRenderSlots(
+      this._data,
+      dateKeys[0],
+      this._pending,
+      this._data.time_zone,
+      this.hass.locale.language
+    );
+    const todayStats = calculatePriceStats(todaySlots);
+    const currentSlot = todaySlots.find((s) => s.isCurrent);
 
     return html`
-      <div
-        class="${classList}"
-        @click="${() => this._handleSlotClick(slot)}"
-        style="--slot-color: ${color}"
-      >
-        <div class="time-label">${slot.time}</div>
-        <div class="price-label" style="color: ${color}">${formatPrice(slot.price)}</div>
-      </div>
+      <ha-card>
+        ${this._renderHeader()}
+        ${this._actionError
+          ? html`<ha-alert
+              alert-type="error"
+              dismissable
+              @alert-dismissed-clicked=${() => (this._actionError = undefined)}
+              >${this._actionError}</ha-alert
+            >`
+          : nothing}
+        ${this._renderInfoBar(scheduledCount, currentSlot?.price ?? null, todayStats)}
+        ${this._config.show_history ? this._renderHistoryBar() : nothing}
+        ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
+        ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
+      </ha-card>
     `;
   }
 
+  private _renderHeader(): TemplateResult | typeof nothing {
+    if (!this._config?.show_name) {
+      return nothing;
+    }
+    const name = this._config.name || this._data?.target_entity || 'Nordpool Scheduler';
+    return html`<div class="card-header"><h2 class="card-title">${name}</h2></div>`;
+  }
+
   private _renderInfoBar(
-    attributes: NordpoolSensorAttributes | null,
     scheduledCount: number,
-    minPrice: number,
-    maxPrice: number,
-    avgPrice: number
+    currentPrice: number | null,
+    stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
-    if (!attributes) return html``;
-
-    const currentPrice = attributes.prices?.[attributes.current_slot];
-
+    const unit = this._config!.price_unit ?? 'cents';
+    const currency = this._data!.currency;
+    const locale = this.hass!.locale.language;
     return html`
       <div class="info-bar">
         <div class="info-item">
           <span class="info-label">Current</span>
-          <span class="info-value">${formatPrice(currentPrice)}</span>
+          <span class="info-value">${formatPrice(currentPrice, unit, currency, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Min</span>
-          <span class="info-value success">${formatPrice(minPrice)}</span>
+          <span class="info-value">${formatPrice(stats?.min ?? null, unit, currency, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Avg</span>
-          <span class="info-value warning">${formatPrice(avgPrice)}</span>
+          <span class="info-value">${formatPrice(stats?.avg ?? null, unit, currency, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Max</span>
-          <span class="info-value error">${formatPrice(maxPrice)}</span>
+          <span class="info-value">${formatPrice(stats?.max ?? null, unit, currency, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Scheduled</span>
@@ -606,403 +333,160 @@ export class NordpoolSchedulerCard extends LitElement {
     `;
   }
 
-  private _renderHistoryBar(): TemplateResult {
-    if (!this._config?.show_history || this._historySegments.length === 0) {
-      return html``;
+  private _renderHistoryBar(): TemplateResult | typeof nothing {
+    if (this._historySegments.length === 0) {
+      return nothing;
     }
-
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const totalDuration = 24 * 60 * 60 * 1000; // 24 hours in ms
-
+    const windowStart = Date.now() - HISTORY_HOURS * 60 * 60 * 1000;
+    const totalDuration = HISTORY_HOURS * 60 * 60 * 1000;
     return html`
       <div class="history-container">
-        <div class="history-label">Last 24h:</div>
+        <div class="history-label">Last ${HISTORY_HOURS}h</div>
         <div class="history-bar">
           ${this._historySegments.map((segment) => {
-            const startOffset = Math.max(0, segment.start.getTime() - yesterday.getTime());
-            const endOffset = Math.min(totalDuration, segment.end.getTime() - yesterday.getTime());
-            const width = ((endOffset - startOffset) / totalDuration) * 100;
-            const left = (startOffset / totalDuration) * 100;
-
-            const isOn = segment.state === 'on';
-            const className = isOn ? 'history-segment on' : 'history-segment off';
-
-            return html`
-              <div
-                class="${className}"
-                style="left: ${left}%; width: ${width}%"
-                title="${segment.state}: ${new Date(segment.start).toLocaleString()} - ${new Date(
-                  segment.end
-                ).toLocaleString()}"
-              ></div>
-            `;
+            const left = Math.max(
+              0,
+              ((segment.start.getTime() - windowStart) / totalDuration) * 100
+            );
+            const right = Math.min(
+              100,
+              ((segment.end.getTime() - windowStart) / totalDuration) * 100
+            );
+            const cls = segment.state === 'on' ? 'on' : 'off';
+            return html`<div
+              class="history-segment ${cls}"
+              style="left: ${left}%; width: ${right - left}%"
+              title="${segment.state}"
+            ></div>`;
           })}
         </div>
       </div>
     `;
   }
 
-  private _getAllSlotsForDay(
-    attributes: NordpoolSensorAttributes,
-    currentSlot: number,
-    day: 'today' | 'tomorrow',
-    displaySlots?: Set<number>
-  ): TimeSlot[] {
-    const slots: TimeSlot[] = [];
-    const prices = attributes.prices || [];
-
-    // Get scheduled slots - use displaySlots if provided (optimistic update), otherwise backend
-    // This is the EXACT same approach as generateTimeSlots in utils.ts
-    const targetDate = day === 'today' ? this._getTodayDate() : this._getTomorrowDate();
-
-    const backendSlots = new Set(
-      (attributes.scheduled_overrides || [])
-        .filter((o) => o.date === targetDate) // Filter by date
-        .map((o) => o.slot)
-    );
-
-    const scheduledSlots = displaySlots ?? backendSlots;
-
-    console.log(`📅 _getAllSlotsForDay(${day}):`, {
-      targetDate,
-      optimisticDate: this._optimisticDate,
-      displaySlotsProvided: !!displaySlots,
-      displaySlotsCount: displaySlots?.size,
-      backendSlotsCount: backendSlots.size,
-      finalScheduledSlotsCount: scheduledSlots.size,
-      usingOptimistic: !!displaySlots,
-    });
-
-    for (let i = 0; i < 96; i++) {
-      const hour = Math.floor(i / 4);
-      const minute = (i % 4) * 15;
-      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-
-      // For today: use direct price index, for tomorrow: offset by 96
-      const priceIdx = day === 'today' ? i : 96 + i;
-      const price = prices[priceIdx] !== undefined ? prices[priceIdx] : null;
-
-      // A slot is in the past if it's today and before the current slot
-      const isPast = day === 'today' && i < currentSlot;
-
-      // NEW: With date-based scheduling, we just check if the slot is in scheduledSlots
-      // (already filtered by date above)
-      const isScheduledForThisDay = scheduledSlots.has(i);
-
-      slots.push({
-        index: i,
-        hour,
-        minute,
-        time,
-        price,
-        isSelected: isScheduledForThisDay,
-        isCurrentTime: day === 'today' && i === currentSlot,
-        isTomorrow: day === 'tomorrow',
-        isPast: isPast,
-      });
-    }
-
-    return slots;
-  }
-
-  private _handleTabChange(newTab: 'today' | 'tomorrow'): void {
-    // Clear ONLY optimistic date when switching tabs to prevent cross-contamination
-    // Don't clear _selectedSlots as it causes UI to show 0 scheduled slots temporarily
-    // The render method will automatically use backend state for the new tab
-    this._optimisticDate = undefined;
-    this._activeTab = newTab;
-    console.log('🔄 Tab changed to:', newTab);
-    // Request update to re-render with correct backend state for new tab
-    this.requestUpdate();
-  }
-
-  private _renderDayTabs(): TemplateResult {
+  private _renderDayTabs(dateKeys: string[]): TemplateResult {
     return html`
       <div class="day-tabs">
-        <button
-          class="day-tab ${this._activeTab === 'today' ? 'active' : ''}"
-          @click=${() => this._handleTabChange('today')}
-        >
-          Today
-        </button>
-        <button
-          class="day-tab ${this._activeTab === 'tomorrow' ? 'active' : ''}"
-          @click=${() => this._handleTabChange('tomorrow')}
-        >
-          Tomorrow
-        </button>
+        ${dateKeys.map(
+          (dateKey) => html`
+            <button
+              class="day-tab ${dateKey === this._activeDate ? 'active' : ''}"
+              @click=${() => (this._activeDate = dateKey)}
+            >
+              ${this._dayLabel(dateKey)}
+            </button>
+          `
+        )}
       </div>
     `;
   }
 
-  protected render(): TemplateResult {
-    if (!this._config || !this.hass) {
-      return html``;
+  private _dayLabel(dateKey: string): string {
+    const today = localDateKey(this._data!.now_slot_start, this._data!.time_zone);
+    if (dateKey === today) {
+      return 'Today';
     }
-
-    const stateObj = this._config.entity ? this.hass.states[this._config.entity] : undefined;
-
-    if (!stateObj) {
-      return html`
-        <ha-card>
-          <div class="error-message">
-            <ha-icon icon="mdi:alert-circle"></ha-icon>
-            <div class="error-title">Entity Not Found</div>
-            <div class="error-details">
-              ${this._config.entity
-                ? `Entity "${this._config.entity}" does not exist in Home Assistant.`
-                : 'Please configure an entity in the card settings.'}
-            </div>
-          </div>
-        </ha-card>
-      `;
-    }
-
-    // Check if entity is unavailable
-    if (stateObj.state === 'unavailable' || stateObj.state === 'unknown') {
-      return html`
-        <ha-card>
-          <div class="error-message">
-            <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-            <div class="error-title">Entity Unavailable</div>
-            <div class="error-details">
-              The sensor "${this._config.entity}" is currently unavailable.
-              <br /><br />
-              <strong>Possible causes:</strong>
-              <ul>
-                <li>The Nordpool Scheduler integration is not running</li>
-                <li>The integration failed to initialize</li>
-                <li>Check Home Assistant logs for errors</li>
-              </ul>
-            </div>
-          </div>
-        </ha-card>
-      `;
-    }
-
-    const attributes = stateObj.attributes as unknown as NordpoolSensorAttributes;
-
-    // Check for required attributes
-    if (!attributes.entry_id || !attributes.prices) {
-      return html`
-        <ha-card>
-          <div class="error-message">
-            <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-            <div class="error-title">Invalid Entity</div>
-            <div class="error-details">
-              The entity "${this._config.entity}" is missing required attributes.
-              <br /><br />
-              <strong>Missing:</strong>
-              <ul>
-                ${!attributes.entry_id ? html`<li>entry_id</li>` : ''}
-                ${!attributes.prices ? html`<li>prices</li>` : ''}
-              </ul>
-              <br />
-              Please ensure this is a valid Nordpool Scheduler sensor.
-            </div>
-          </div>
-        </ha-card>
-      `;
-    }
-    const currentSlot = getCurrentSlotIndex();
-
-    // Use backend state by default, only use local state if it's different (optimistic update in progress)
-    // In day tabs mode, only compare against slots for the current date
-    let backendSlots: Set<number>;
-    let currentDate: string;
-
-    if (this._config.show_day_tabs) {
-      currentDate = this._activeTab === 'tomorrow' ? this._getTomorrowDate() : this._getTodayDate();
-      backendSlots = new Set(
-        (attributes.scheduled_overrides || [])
-          .filter((o) => o.date === currentDate)
-          .map((o) => o.slot)
-      );
-    } else {
-      // In single view, use all slots (rolling window)
-      currentDate = this._getTodayDate();
-      backendSlots = new Set((attributes.scheduled_overrides || []).map((o) => o.slot));
-    }
-
-    // Only consider local changes if we have an optimistic date that matches current view
-    // This prevents stale _selectedSlots from previous tab from being used
-    const hasOptimisticUpdate = this._optimisticDate === currentDate;
-    const hasLocalChanges =
-      hasOptimisticUpdate &&
-      (this._selectedSlots.size !== backendSlots.size ||
-        Array.from(this._selectedSlots).some((s) => !backendSlots.has(s)));
-
-    // Debug: Log state comparison
-    console.group('🎨 Render State Debug');
-    if (this._config.show_day_tabs) {
-      console.log('Day tabs mode - Active tab:', this._activeTab, 'Date:', currentDate);
-    }
-    console.log('Backend slots:', {
-      count: backendSlots.size,
-      slots: Array.from(backendSlots).sort((a, b) => a - b),
-    });
-    console.log('Local slots (_selectedSlots):', {
-      count: this._selectedSlots.size,
-      slots: Array.from(this._selectedSlots).sort((a, b) => a - b),
-    });
-    console.log('Has local changes:', hasLocalChanges);
-    console.log('Optimistic date:', this._optimisticDate);
-    console.log('Current date:', currentDate);
-
-    // Only use optimistic local state if we have pending changes AND the optimistic date matches the current view
-    // This prevents showing optimistic state for "today" when viewing "tomorrow" tab (and vice versa)
-    const isOptimisticDateValid = !this._optimisticDate || this._optimisticDate === currentDate;
-    const displaySlots = hasLocalChanges && isOptimisticDateValid ? this._selectedSlots : undefined;
-
-    console.log(
-      '🎨 Display slots (undefined = use backend):',
-      displaySlots
-        ? {
-            count: displaySlots.size,
-            slots: Array.from(displaySlots)
-              .sort((a, b) => a - b)
-              .slice(0, 10),
-            optimisticDate: this._optimisticDate,
-            currentDate: currentDate,
-            isOptimisticDateValid: isOptimisticDateValid,
-            showDayTabs: this._config.show_day_tabs,
-            activeTab: this._config.show_day_tabs ? this._activeTab : 'N/A',
-          }
-        : {
-            reason: 'using backend',
-            hasLocalChanges: hasLocalChanges,
-            isOptimisticDateValid: isOptimisticDateValid,
-          }
+    const tomorrow = localDateKey(
+      new Date(new Date(this._data!.now_slot_start).getTime() + 86400000).toISOString(),
+      this._data!.time_zone
     );
-
-    // Use different slot generation for tabs vs normal view
-    const slots = this._config.show_day_tabs
-      ? this._getAllSlotsForDay(attributes, currentSlot, this._activeTab, displaySlots)
-      : generateTimeSlots(attributes, currentSlot, displaySlots);
-
-    console.log(
-      'Generated slots sample (first 5):',
-      slots.slice(0, 5).map((s) => ({
-        index: s.index,
-        time: s.time,
-        isSelected: s.isSelected,
-        isPast: s.isPast,
-      }))
+    if (dateKey === tomorrow) {
+      return 'Tomorrow';
+    }
+    return formatDayHeading(
+      `${dateKey}T12:00:00Z`,
+      this._data!.time_zone,
+      this.hass!.locale.language
     );
-    console.groupEnd();
+  }
 
-    const displayedSlots = slots;
-
-    // Calculate price statistics from visible slots
-    const priceStats = calculatePriceStats(displayedSlots);
-
-    const hourGroups = groupSlotsByHour(displayedSlots);
-
-    const cardName = this._config.name || attributes.scheduler_name || 'Nordpool Scheduler';
+  private _renderDaySection(dateKey: string, showTabs: boolean): TemplateResult {
+    const slots = buildRenderSlots(
+      this._data!,
+      dateKey,
+      this._pending,
+      this._data!.time_zone,
+      this.hass!.locale.language
+    );
+    const hasPrices = slots.some((s) => s.price !== null);
+    const stats = calculatePriceStats(slots);
 
     return html`
-      <ha-card>
-        ${this._config.show_name
-          ? html`
-              <div class="card-header">
-                <h2 class="card-title">${cardName}</h2>
-              </div>
-            `
-          : ''}
-        ${this._renderInfoBar(
-          attributes,
-          hasLocalChanges ? this._selectedSlots.size : backendSlots.size,
-          priceStats.min,
-          priceStats.max,
-          priceStats.avg
-        )}
-        ${this._renderHistoryBar()} ${this._config.show_day_tabs ? this._renderDayTabs() : ''}
+      ${showTabs ? nothing : html`<div class="day-heading">${this._dayLabel(dateKey)}</div>`}
+      ${hasPrices
+        ? html`<div class="schedule-grid">
+            ${slots.map((slot) => this._renderSlot(slot, stats))}
+          </div>`
+        : html`<div class="placeholder-message">Prices published ~14:00 CET</div>`}
+    `;
+  }
 
-        <div class="schedule-grid compact">
-          ${hourGroups.map((hourSlots) => {
-            return html`${hourSlots.map((slot) =>
-              this._renderSlot(slot, priceStats.min, priceStats.max, priceStats.avg)
-            )}`;
-          })}
+  private _renderSlot(
+    slot: RenderSlot,
+    stats: ReturnType<typeof calculatePriceStats>
+  ): TemplateResult {
+    const tier = priceTier(slot.price, stats);
+    const classes = [
+      'time-slot',
+      `tier-${tier}`,
+      slot.effective === 'on' ? 'on' : '',
+      slot.isCurrent ? 'current' : '',
+      slot.isPast ? 'past' : '',
+      slot.isPending ? 'pending' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const unit = this._config!.price_unit ?? 'cents';
+    return html`
+      <div
+        class=${classes}
+        role="button"
+        tabindex=${slot.isPast ? -1 : 0}
+        @click=${() => this._onSlotClick(slot)}
+        @keydown=${(ev: KeyboardEvent) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            this._onSlotClick(slot);
+          }
+        }}
+      >
+        ${slot.isOverridden ? html`<div class="override-dot"></div>` : nothing}
+        <div class="time-label">${slot.time}</div>
+        <div class="price-label">
+          ${formatPrice(slot.price, unit, this._data!.currency, this.hass!.locale.language)}
         </div>
-      </ha-card>
+      </div>
     `;
   }
 
   static get styles() {
     return sharedStyles;
   }
+}
 
-  public getCardSize(): number {
-    return 9;
+function errorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return String(err);
+}
+
+/** All local calendar days present in the snapshot, sorted, deduplicated. */
+function availableDateKeys(data: ScheduleSnapshot): string[] {
+  const keys = new Set(data.slots.map((s) => localDateKey(s.start, data.time_zone)));
+  return Array.from(keys).sort();
+}
+
+if (!customElements.get('nordpool-scheduler-card')) {
+  customElements.define('nordpool-scheduler-card', NordpoolSchedulerCard);
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'nordpool-scheduler-card': NordpoolSchedulerCard;
   }
 }
 
-// Register with Home Assistant's custom card registry FIRST
-console.info(
-  '%c🎴 NORDPOOL-SCHEDULER-CARD %c\n' + 'Version: 1.0.0\n' + 'Registering custom element...',
-  'color: orange; font-weight: bold; background: black',
-  'color: white; background: black'
-);
-
-// STEP 1: Register the custom element FIRST
-try {
-  if (!customElements.get('nordpool-scheduler-card')) {
-    console.log('📝 About to register nordpool-scheduler-card...');
-    console.log('📝 Class to register:', NordpoolSchedulerCard);
-    console.log('📝 Has getStubConfig?:', typeof NordpoolSchedulerCard.getStubConfig);
-
-    customElements.define('nordpool-scheduler-card', NordpoolSchedulerCard);
-    console.info(
-      '%c✅ nordpool-scheduler-card element registered successfully',
-      'color: green; font-weight: bold'
-    );
-
-    // Verify registration immediately
-    const check = customElements.get('nordpool-scheduler-card');
-    console.log('🔍 Immediate verification:', check);
-    console.log('🔍 Can get stub config?:', typeof check?.getStubConfig);
-
-    // Make it globally accessible for HA
-    (window as any).customElements.get('nordpool-scheduler-card');
-
-    // Verify multiple times
-    setTimeout(() => {
-      const check2 = customElements.get('nordpool-scheduler-card');
-      console.log('🔍 100ms later - still there:', !!check2);
-    }, 100);
-
-    setTimeout(() => {
-      const check3 = customElements.get('nordpool-scheduler-card');
-      console.log('🔍 500ms later - still there:', !!check3);
-    }, 500);
-
-    setTimeout(() => {
-      const check4 = customElements.get('nordpool-scheduler-card');
-      console.log('🔍 1000ms later - still there:', !!check4);
-    }, 1000);
-
-    setTimeout(() => {
-      const check5 = customElements.get('nordpool-scheduler-card');
-      console.log('🔍 2000ms later - still there:', !!check5);
-    }, 2000);
-  } else {
-    console.warn('⚠️ nordpool-scheduler-card already registered');
-  }
-} catch (err) {
-  console.error('❌ Failed to register nordpool-scheduler-card:', err);
-}
-
-// Export for debugging and HA access
-(window as any).NordpoolSchedulerCard = NordpoolSchedulerCard;
-
-// Also register in a way that HA's card picker might expect
-if (typeof customElements !== 'undefined' && customElements.get) {
-  console.log('🔍 Final check - element exists:', !!customElements.get('nordpool-scheduler-card'));
-}
-
-// Register in window.customCards for card picker
 declare global {
   interface Window {
     customCards?: Array<{
@@ -1015,13 +499,12 @@ declare global {
   }
 }
 
-const win = window as any;
+const win = window as Window;
 win.customCards = win.customCards || [];
 win.customCards.push({
-  type: 'custom:nordpool-scheduler-card',
+  type: 'nordpool-scheduler-card',
   name: 'Nordpool Scheduler Card',
-  description: 'A custom card for Nordpool price-based scheduling with 15-minute intervals',
-  preview: false,
+  description: 'Schedule an entity by 15-minute Nord Pool price slots.',
+  preview: true,
+  documentationURL: 'https://github.com/klejejs/ha-nordpool-scheduler-card',
 });
-
-console.log('✅ Card registered and added to picker!');

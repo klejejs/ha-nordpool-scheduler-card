@@ -1,12 +1,12 @@
 {
   "name": "nordpool-scheduler-card",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A custom Home Assistant Lovelace card for Nordpool price-based scheduling",
   "main": "dist/nordpool-scheduler-card.js",
   "scripts": {
     "start": "rollup -c --watch",
     "build": "rollup -c",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src --ext .ts && tsc --noEmit",
     "format": "prettier --write src/**/*.ts"
   },
   "packageManager": "yarn@1.22.22",
@@ -41,7 +41,6 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "custom-card-helpers": "^1.9.0",
     "home-assistant-js-websocket": "^8.2.0",
     "lit": "^3.0.0"
   }

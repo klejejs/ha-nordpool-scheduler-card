@@ -2,20 +2,12 @@ import { css } from 'lit';
 
 export const sharedStyles = css`
   :host {
-    --spacing: 8px;
-    --border-radius: 12px;
-    --icon-size: 40px;
-    --button-size: 48px;
-    --yellow-color: #ffeb3b;
+    --np-spacing: 8px;
+    --np-radius: 12px;
   }
 
   ha-card {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    border-radius: var(--border-radius);
-    padding: calc(var(--spacing) * 1.5);
+    padding: calc(var(--np-spacing) * 1.5);
     box-sizing: border-box;
   }
 
@@ -23,7 +15,7 @@ export const sharedStyles = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--spacing);
+    margin-bottom: var(--np-spacing);
   }
 
   .card-title {
@@ -33,280 +25,177 @@ export const sharedStyles = css`
     color: var(--primary-text-color);
   }
 
-  .schedule-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: calc(var(--spacing) / 2);
-    width: 100%;
-  }
-
-  .time-slot {
-    aspect-ratio: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-radius: calc(var(--border-radius) / 1.5);
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    background: var(--card-background-color);
-    border: 2px solid var(--divider-color);
-    padding: 4px;
-    box-sizing: border-box;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .schedule-grid.compact .time-slot {
-    aspect-ratio: auto;
-    padding: 6px 4px;
-    min-height: 40px;
-  }
-
-  .time-slot:hover {
-    transform: scale(1.05);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  }
-
-  .time-slot.selected {
-    border-color: var(--info-color);
-    background: rgba(var(--rgb-info-color, 3, 169, 244), 0.1);
-  }
-
-  .time-slot.current {
-    border-width: 3px;
-    border-color: var(--primary-color);
-  }
-
-  .time-slot.tomorrow::after {
-    content: 'tmrw';
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 0.65em;
-    font-weight: 600;
-    color: var(--primary-color);
-    background: var(--card-background-color, #fff);
-    padding: 1px 3px;
-    border-radius: 3px;
-    border: 1px solid var(--primary-color);
-  }
-
-  .time-slot.past {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: var(--disabled-color, #e0e0e0);
-  }
-
-  .time-slot.past:hover {
-    transform: none;
-    box-shadow: none;
-  }
-
-  .time-slot.past .time-label,
-  .time-slot.past .price-label {
-    color: var(--disabled-text-color);
-  }
-
-  .time-label {
-    font-size: 0.9em;
-    font-weight: 500;
-    color: var(--primary-text-color);
-    margin-bottom: 2px;
-    white-space: nowrap;
-  }
-
-  .price-label {
-    font-size: 0.8em;
-    font-weight: 600;
-    color: var(--secondary-text-color);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  .time-slot .price-label {
-    transition: color 0.2s ease-in-out;
-  }
-
-  .hour-divider {
-    grid-column: 1 / -1;
-    height: 1px;
-    background: var(--divider-color);
-    margin: var(--spacing) 0;
-  }
-
   .info-bar {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: var(--spacing);
-    background: var(--secondary-background-color);
-    border-radius: calc(var(--border-radius) / 2);
-    margin-bottom: var(--spacing);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--np-spacing);
+    padding: calc(var(--np-spacing) * 0.75) 0;
+    margin-bottom: var(--np-spacing);
   }
 
   .info-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    min-width: 0;
   }
 
   .info-label {
     font-size: 0.7em;
-    color: var(--secondary-text-color);
     text-transform: uppercase;
-    font-weight: 500;
+    color: var(--secondary-text-color);
   }
 
   .info-value {
-    font-size: 0.9em;
-    font-weight: 600;
+    font-size: 1em;
+    font-weight: 500;
     color: var(--primary-text-color);
   }
 
-  .info-value.success {
-    color: var(--success-color);
+  .day-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: var(--np-spacing);
   }
 
-  .info-value.error {
-    color: var(--error-color);
+  .day-tab {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: var(--np-radius);
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+    font-weight: 500;
+    cursor: pointer;
   }
 
-  .info-value.warning {
-    color: var(--warning-color);
+  .day-tab.active {
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+  }
+
+  .day-heading {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--secondary-text-color);
+    margin: var(--np-spacing) 0 4px;
   }
 
   .history-container {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing);
-    padding: calc(var(--spacing) / 2) var(--spacing);
-    background: var(--secondary-background-color);
-    border-radius: calc(var(--border-radius) / 2);
-    margin-bottom: var(--spacing);
+    margin-bottom: var(--np-spacing);
   }
 
   .history-label {
-    font-size: 0.7em;
+    font-size: 0.75em;
     color: var(--secondary-text-color);
-    text-transform: uppercase;
-    font-weight: 500;
-    white-space: nowrap;
-    min-width: 60px;
+    margin-bottom: 4px;
   }
 
   .history-bar {
     position: relative;
-    flex: 1;
-    height: 24px;
-    background: var(--disabled-color);
+    height: 8px;
     border-radius: 4px;
+    background: var(--divider-color);
     overflow: hidden;
   }
 
   .history-segment {
     position: absolute;
     top: 0;
-    height: 100%;
-    transition: opacity 0.2s;
-  }
-
-  .history-segment:hover {
-    opacity: 0.8;
+    bottom: 0;
   }
 
   .history-segment.on {
-    background: var(--warning-color);
+    background: var(--success-color);
   }
 
   .history-segment.off {
     background: var(--disabled-text-color);
-    opacity: 0.5;
   }
 
-  .error-message {
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    width: 100%;
+  }
+
+  .time-slot {
+    position: relative;
+    aspect-ratio: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: calc(var(--spacing) * 3);
-    text-align: center;
-    gap: var(--spacing);
-  }
-
-  .error-message ha-icon {
-    --mdc-icon-size: 48px;
-    color: var(--error-color);
-  }
-
-  .error-title {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: var(--primary-text-color);
-    margin-top: var(--spacing);
-  }
-
-  .error-details {
-    font-size: 0.9em;
-    color: var(--secondary-text-color);
-    line-height: 1.5;
-    max-width: 400px;
-  }
-
-  .error-details ul {
-    text-align: left;
-    margin: var(--spacing) 0;
-    padding-left: calc(var(--spacing) * 2);
-  }
-
-  .error-details li {
-    margin: 4px 0;
-  }
-
-  .error-details strong {
-    color: var(--primary-text-color);
-  }
-
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: calc(var(--spacing) * 4);
-  }
-
-  .day-tabs {
-    display: flex;
-    gap: calc(var(--spacing) / 2);
-    padding: 0 var(--spacing) var(--spacing) var(--spacing);
-  }
-
-  .day-tab {
-    flex: 1;
-    padding: 10px 16px;
+    gap: 2px;
+    border-radius: calc(var(--np-radius) / 1.5);
+    cursor: pointer;
     background: var(--card-background-color);
     border: 2px solid var(--divider-color);
-    border-radius: calc(var(--border-radius) / 2);
-    color: var(--primary-text-color);
-    font-size: 0.95em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    box-sizing: border-box;
+    padding: 2px;
+    overflow: hidden;
   }
 
-  .day-tab:hover {
-    background: var(--secondary-background-color);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  .time-slot.tier-low {
+    border-color: color-mix(in srgb, var(--success-color) 50%, var(--divider-color));
+    background: color-mix(in srgb, var(--success-color) 10%, var(--card-background-color));
   }
 
-  .day-tab.active {
-    background: var(--primary-color);
-    color: var(--text-primary-color, white);
+  .time-slot.tier-mid {
+    border-color: color-mix(in srgb, var(--warning-color) 45%, var(--divider-color));
+    background: color-mix(in srgb, var(--warning-color) 10%, var(--card-background-color));
+  }
+
+  .time-slot.tier-high {
+    border-color: color-mix(in srgb, var(--error-color) 50%, var(--divider-color));
+    background: color-mix(in srgb, var(--error-color) 10%, var(--card-background-color));
+  }
+
+  .time-slot.on {
     border-color: var(--primary-color);
+    border-width: 3px;
+  }
+
+  .time-slot.current {
+    box-shadow: 0 0 0 2px var(--primary-color) inset;
+  }
+
+  .time-slot.past {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .time-slot.pending {
+    opacity: 0.65;
+  }
+
+  .time-label {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: var(--primary-text-color);
+  }
+
+  .price-label {
+    font-size: 0.7em;
+    color: var(--secondary-text-color);
+  }
+
+  .override-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary-color);
+  }
+
+  .placeholder-message {
+    text-align: center;
+    color: var(--secondary-text-color);
+    font-size: 0.85em;
+    padding: calc(var(--np-spacing) * 2) 0;
   }
 `;
