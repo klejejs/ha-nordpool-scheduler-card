@@ -16,6 +16,7 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_day_selector?: boolean;
   compact_view?: boolean;
   show_history?: boolean;
+  show_day_tabs?: boolean;
 }
 
 export interface NordpoolSensorAttributes {
@@ -35,7 +36,9 @@ export interface NordpoolSensorAttributes {
 }
 
 export interface ScheduledOverride {
+  date: string; // NEW: ISO date "YYYY-MM-DD"
   time: string;
+  datetime: string; // NEW: Combined "YYYY-MM-DD HH:MM"
   slot: number;
   state: string;
 }
@@ -49,6 +52,7 @@ export interface TimeSlot {
   isSelected: boolean;
   isCurrentTime: boolean;
   isTomorrow: boolean;
+  isPast?: boolean;
 }
 
 export interface HistoryState {

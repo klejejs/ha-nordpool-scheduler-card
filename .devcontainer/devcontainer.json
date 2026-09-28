@@ -1,9 +1,9 @@
 {
   "name": "Nordpool Scheduler Card Development",
-  "image": "node:20-bookworm",
-  "forwardPorts": [5000, 8123],
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  "forwardPorts": [5005, 8123],
   "portsAttributes": {
-    "5000": {
+    "5005": {
       "label": "Development Server",
       "onAutoForward": "notify"
     },
@@ -22,9 +22,5 @@
         "visualstudioexptteam.vscodeintellicode"
       ]
     }
-  },
-  "remoteUser": "node",
-  "remoteEnv": {
-    "NPM_CONFIG_PREFIX": "/home/node/.npm-global"
   }
 }

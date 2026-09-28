@@ -92,6 +92,22 @@ export const sharedStyles = css`
     border: 1px solid var(--primary-color);
   }
 
+  .time-slot.past {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--disabled-color, #e0e0e0);
+  }
+
+  .time-slot.past:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .time-slot.past .time-label,
+  .time-slot.past .price-label {
+    color: var(--disabled-text-color);
+  }
+
   .time-label {
     font-size: 0.9em;
     font-weight: 500;
@@ -259,5 +275,38 @@ export const sharedStyles = css`
     align-items: center;
     justify-content: center;
     padding: calc(var(--spacing) * 4);
+  }
+
+  .day-tabs {
+    display: flex;
+    gap: calc(var(--spacing) / 2);
+    padding: 0 var(--spacing) var(--spacing) var(--spacing);
+  }
+
+  .day-tab {
+    flex: 1;
+    padding: 10px 16px;
+    background: var(--card-background-color);
+    border: 2px solid var(--divider-color);
+    border-radius: calc(var(--border-radius) / 2);
+    color: var(--primary-text-color);
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .day-tab:hover {
+    background: var(--secondary-background-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .day-tab.active {
+    background: var(--primary-color);
+    color: var(--text-primary-color, white);
+    border-color: var(--primary-color);
   }
 `;

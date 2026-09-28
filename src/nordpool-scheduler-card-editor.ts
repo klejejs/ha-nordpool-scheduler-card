@@ -200,6 +200,17 @@ export class NordpoolSchedulerCardEditor extends LitElement implements LovelaceC
           </div>
         </div>
 
+        <div class="option checkbox-option">
+          <ha-formfield label="Show Day Tabs">
+            <ha-checkbox
+              .checked=${this._config.show_day_tabs === true}
+              .configValue=${'show_day_tabs'}
+              @change=${this._valueChanged}
+            ></ha-checkbox>
+          </ha-formfield>
+          <div class="helper-text">Split today and tomorrow into separate tabs.</div>
+        </div>
+
         <div class="info-box">
           <ha-icon icon="mdi:information-outline"></ha-icon>
           <div class="info-content">

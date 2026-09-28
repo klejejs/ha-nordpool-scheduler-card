@@ -30,6 +30,8 @@ export class NordpoolSchedulerCard extends LitElement {
   @state() private _config?: NordpoolSchedulerCardConfig;
   @state() private _selectedSlots: Set<number> = new Set();
   @state() private _historySegments: HistorySegment[] = [];
+  @state() private _activeTab: 'today' | 'tomorrow' = 'today';
+  @state() private _optimisticDate?: string; // Track which date has optimistic changes
   private _updateInterval?: number;
 
   // Public getter for config (required by custom-card-helpers)
@@ -210,25 +212,22 @@ export class NordpoolSchedulerCard extends LitElement {
 
       // Update local state from service response
       if (response && response.response && typeof response.response === 'object') {
-        // The backend returns: { schedule: { "0": true, "1": false, ... } }
-        const slotsData =
-          'schedule' in response.response
-            ? response.response.schedule
-            : 'slots' in response.response
-              ? response.response.slots
-              : response.response;
+        // NEW: Backend now returns grouped by date: { schedule: { "2025-10-07": { 0: true, 4: true }, "2025-10-08": {...} } }
+        const scheduleData =
+          'schedule' in response.response ? response.response.schedule : response.response;
 
-        console.log('📊 Parsed slots data:', {
-          slotsDataType: typeof slotsData,
-          slotsDataKeys: slotsData ? Object.keys(slotsData).slice(0, 10) : 'none',
-          slotsDataSample: slotsData,
+        console.log('📊 Parsed schedule data:', {
+          scheduleDataType: typeof scheduleData,
+          scheduleDataKeys: scheduleData ? Object.keys(scheduleData) : 'none',
+          scheduleDataSample: scheduleData,
         });
 
-        const enabledSlots = Object.entries(slotsData)
-          .filter(([_, enabled]) => enabled === true)
-          .map(([index]) => parseInt(index));
-
-        this._selectedSlots = new Set(enabledSlots);
+        // Don't flatten the schedule - the backend returns date-grouped data
+        // We should NOT store it in _selectedSlots as that's only for optimistic updates
+        // The render method will read directly from attributes.scheduled_overrides
+        // Just clear any optimistic state since we have fresh backend data
+        this._selectedSlots = new Set();
+        this._optimisticDate = undefined;
         console.log('🔄 Synced state from service:', {
           count: this._selectedSlots.size,
           slots: Array.from(this._selectedSlots)
@@ -376,7 +375,31 @@ export class NordpoolSchedulerCard extends LitElement {
     }
   }
 
+  private _getTodayDate(): string {
+    // Use local date, not UTC
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private _getTomorrowDate(): string {
+    // Use local date, not UTC
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   private _handleSlotClick(slot: TimeSlot): void {
+    // Don't allow clicking on past slots
+    if (slot.isPast) {
+      return;
+    }
+
     if (!this.hass || !this._config?.entity) return;
 
     const stateObj = this.hass.states[this._config.entity];
@@ -397,32 +420,101 @@ export class NordpoolSchedulerCard extends LitElement {
       return;
     }
 
+    // Determine target date based on mode
+    let targetDate: string;
+    if (this._config.show_day_tabs) {
+      // Day tabs mode: explicit date based on active tab
+      const todayDate = this._getTodayDate();
+      const tomorrowDate = this._getTomorrowDate();
+      targetDate = this._activeTab === 'tomorrow' ? tomorrowDate : todayDate;
+      console.log('📅 Date calculation (day tabs):', {
+        today: todayDate,
+        tomorrow: tomorrowDate,
+        activeTab: this._activeTab,
+        selectedDate: targetDate,
+      });
+    } else {
+      // Single view mode: rolling window logic
+      // Slots >= currentSlot are today, slots < currentSlot are tomorrow
+      const currentSlot = attributes.current_slot ?? 0;
+      const todayDate = this._getTodayDate();
+      const tomorrowDate = this._getTomorrowDate();
+      targetDate = slot.index >= currentSlot ? todayDate : tomorrowDate;
+      console.log('📅 Date calculation (rolling window):', {
+        today: todayDate,
+        tomorrow: tomorrowDate,
+        slotIndex: slot.index,
+        currentSlot,
+        selectedDate: targetDate,
+      });
+    }
+
     // Determine if slot should be enabled or disabled
-    const isCurrentlySelected = this._selectedSlots.has(slot.index);
+    const isCurrentlySelected = slot.isSelected;
     const newEnabledState = !isCurrentlySelected;
 
+    console.log('🔄 Slot click - Current state:', {
+      slotIndex: slot.index,
+      time: slot.time,
+      isCurrentlySelected,
+      newEnabledState,
+      targetDate,
+    });
+
     // Update local state immediately for instant UI feedback (optimistic update)
-    const newSelectedSlots = new Set(this._selectedSlots);
+    // Start with current backend state for this date, then apply the change
+    const currentBackendSlots = new Set(
+      (attributes.scheduled_overrides || []).filter((o) => o.date === targetDate).map((o) => o.slot)
+    );
+
+    console.log('📦 Backend slots for date:', {
+      targetDate,
+      count: currentBackendSlots.size,
+      slots: Array.from(currentBackendSlots).sort((a, b) => a - b),
+    });
+
+    const newSelectedSlots = new Set(currentBackendSlots);
     if (newEnabledState) {
       newSelectedSlots.add(slot.index);
     } else {
       newSelectedSlots.delete(slot.index);
     }
+
+    console.log('✨ New optimistic state:', {
+      count: newSelectedSlots.size,
+      slots: Array.from(newSelectedSlots).sort((a, b) => a - b),
+    });
+
     this._selectedSlots = newSelectedSlots;
+    this._optimisticDate = targetDate; // Track which date has optimistic changes
     this.requestUpdate();
 
-    // Call the service to update single slot
+    // Call set_slot service to toggle individual slot
+    const serviceData = {
+      entry_id: entryId,
+      slot_index: slot.index,
+      enabled: newEnabledState,
+      date: targetDate,
+    };
+
+    console.log('🎯 Calling set_slot service:', {
+      slot_index: slot.index,
+      time: slot.time,
+      enabled: newEnabledState,
+      date: targetDate,
+      mode: this._config.show_day_tabs ? 'day-tabs' : 'rolling-window',
+      activeTab: this._config.show_day_tabs ? this._activeTab : 'N/A',
+      serviceData,
+    });
+
     this.hass
-      .callService('nordpool_scheduler', 'set_slot', {
-        entry_id: entryId,
-        slot_index: slot.index,
-        enabled: newEnabledState,
-      })
+      .callService('nordpool_scheduler', 'set_slot', serviceData)
       .then(async () => {
         console.log(
-          `✅ Slot ${slot.index} (${slot.time}) set to ${newEnabledState ? 'enabled' : 'disabled'}`
+          `✅ Slot ${slot.index} (${slot.time}) set to ${newEnabledState ? 'enabled' : 'disabled'} for ${targetDate}`
         );
-        // Fetch fresh schedule from service
+        // Clear optimistic state and fetch fresh schedule
+        this._optimisticDate = undefined;
         await this._fetchSchedule(entryId);
       })
       .catch((err) => {
@@ -433,9 +525,12 @@ export class NordpoolSchedulerCard extends LitElement {
           error: err,
         });
 
-        // Revert optimistic update on error
-        const oldOverrides = attributes.scheduled_overrides || [];
-        this._selectedSlots = new Set(oldOverrides.map((o) => o.slot));
+        // Revert optimistic update on error - restore backend state for this date
+        const oldOverrides = (attributes.scheduled_overrides || [])
+          .filter((o) => o.date === targetDate)
+          .map((o) => o.slot);
+        this._selectedSlots = new Set(oldOverrides);
+        this._optimisticDate = undefined;
         this.requestUpdate();
 
         // Show error to user
@@ -457,6 +552,7 @@ export class NordpoolSchedulerCard extends LitElement {
       slot.isSelected ? 'selected' : '',
       slot.isCurrentTime ? 'current' : '',
       slot.isTomorrow ? 'tomorrow' : '',
+      slot.isPast ? 'past' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -547,6 +643,99 @@ export class NordpoolSchedulerCard extends LitElement {
     `;
   }
 
+  private _getAllSlotsForDay(
+    attributes: NordpoolSensorAttributes,
+    currentSlot: number,
+    day: 'today' | 'tomorrow',
+    displaySlots?: Set<number>
+  ): TimeSlot[] {
+    const slots: TimeSlot[] = [];
+    const prices = attributes.prices || [];
+
+    // Get scheduled slots - use displaySlots if provided (optimistic update), otherwise backend
+    // This is the EXACT same approach as generateTimeSlots in utils.ts
+    const targetDate = day === 'today' ? this._getTodayDate() : this._getTomorrowDate();
+
+    const backendSlots = new Set(
+      (attributes.scheduled_overrides || [])
+        .filter((o) => o.date === targetDate) // Filter by date
+        .map((o) => o.slot)
+    );
+
+    const scheduledSlots = displaySlots ?? backendSlots;
+
+    console.log(`📅 _getAllSlotsForDay(${day}):`, {
+      targetDate,
+      optimisticDate: this._optimisticDate,
+      displaySlotsProvided: !!displaySlots,
+      displaySlotsCount: displaySlots?.size,
+      backendSlotsCount: backendSlots.size,
+      finalScheduledSlotsCount: scheduledSlots.size,
+      usingOptimistic: !!displaySlots,
+    });
+
+    for (let i = 0; i < 96; i++) {
+      const hour = Math.floor(i / 4);
+      const minute = (i % 4) * 15;
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+
+      // For today: use direct price index, for tomorrow: offset by 96
+      const priceIdx = day === 'today' ? i : 96 + i;
+      const price = prices[priceIdx] !== undefined ? prices[priceIdx] : null;
+
+      // A slot is in the past if it's today and before the current slot
+      const isPast = day === 'today' && i < currentSlot;
+
+      // NEW: With date-based scheduling, we just check if the slot is in scheduledSlots
+      // (already filtered by date above)
+      const isScheduledForThisDay = scheduledSlots.has(i);
+
+      slots.push({
+        index: i,
+        hour,
+        minute,
+        time,
+        price,
+        isSelected: isScheduledForThisDay,
+        isCurrentTime: day === 'today' && i === currentSlot,
+        isTomorrow: day === 'tomorrow',
+        isPast: isPast,
+      });
+    }
+
+    return slots;
+  }
+
+  private _handleTabChange(newTab: 'today' | 'tomorrow'): void {
+    // Clear ONLY optimistic date when switching tabs to prevent cross-contamination
+    // Don't clear _selectedSlots as it causes UI to show 0 scheduled slots temporarily
+    // The render method will automatically use backend state for the new tab
+    this._optimisticDate = undefined;
+    this._activeTab = newTab;
+    console.log('🔄 Tab changed to:', newTab);
+    // Request update to re-render with correct backend state for new tab
+    this.requestUpdate();
+  }
+
+  private _renderDayTabs(): TemplateResult {
+    return html`
+      <div class="day-tabs">
+        <button
+          class="day-tab ${this._activeTab === 'today' ? 'active' : ''}"
+          @click=${() => this._handleTabChange('today')}
+        >
+          Today
+        </button>
+        <button
+          class="day-tab ${this._activeTab === 'tomorrow' ? 'active' : ''}"
+          @click=${() => this._handleTabChange('tomorrow')}
+        >
+          Tomorrow
+        </button>
+      </div>
+    `;
+  }
+
   protected render(): TemplateResult {
     if (!this._config || !this.hass) {
       return html``;
@@ -619,13 +808,36 @@ export class NordpoolSchedulerCard extends LitElement {
     const currentSlot = getCurrentSlotIndex();
 
     // Use backend state by default, only use local state if it's different (optimistic update in progress)
-    const backendSlots = new Set((attributes.scheduled_overrides || []).map((o) => o.slot));
+    // In day tabs mode, only compare against slots for the current date
+    let backendSlots: Set<number>;
+    let currentDate: string;
+
+    if (this._config.show_day_tabs) {
+      currentDate = this._activeTab === 'tomorrow' ? this._getTomorrowDate() : this._getTodayDate();
+      backendSlots = new Set(
+        (attributes.scheduled_overrides || [])
+          .filter((o) => o.date === currentDate)
+          .map((o) => o.slot)
+      );
+    } else {
+      // In single view, use all slots (rolling window)
+      currentDate = this._getTodayDate();
+      backendSlots = new Set((attributes.scheduled_overrides || []).map((o) => o.slot));
+    }
+
+    // Only consider local changes if we have an optimistic date that matches current view
+    // This prevents stale _selectedSlots from previous tab from being used
+    const hasOptimisticUpdate = this._optimisticDate === currentDate;
     const hasLocalChanges =
-      this._selectedSlots.size !== backendSlots.size ||
-      Array.from(this._selectedSlots).some((s) => !backendSlots.has(s));
+      hasOptimisticUpdate &&
+      (this._selectedSlots.size !== backendSlots.size ||
+        Array.from(this._selectedSlots).some((s) => !backendSlots.has(s)));
 
     // Debug: Log state comparison
     console.group('🎨 Render State Debug');
+    if (this._config.show_day_tabs) {
+      console.log('Day tabs mode - Active tab:', this._activeTab, 'Date:', currentDate);
+    }
     console.log('Backend slots:', {
       count: backendSlots.size,
       slots: Array.from(backendSlots).sort((a, b) => a - b),
@@ -635,36 +847,57 @@ export class NordpoolSchedulerCard extends LitElement {
       slots: Array.from(this._selectedSlots).sort((a, b) => a - b),
     });
     console.log('Has local changes:', hasLocalChanges);
+    console.log('Optimistic date:', this._optimisticDate);
+    console.log('Current date:', currentDate);
 
-    // Only use optimistic local state if we have pending changes, otherwise use backend truth
-    const displaySlots = hasLocalChanges ? this._selectedSlots : undefined;
+    // Only use optimistic local state if we have pending changes AND the optimistic date matches the current view
+    // This prevents showing optimistic state for "today" when viewing "tomorrow" tab (and vice versa)
+    const isOptimisticDateValid = !this._optimisticDate || this._optimisticDate === currentDate;
+    const displaySlots = hasLocalChanges && isOptimisticDateValid ? this._selectedSlots : undefined;
+
     console.log(
-      'Display slots (undefined = use backend):',
+      '🎨 Display slots (undefined = use backend):',
       displaySlots
         ? {
             count: displaySlots.size,
             slots: Array.from(displaySlots)
               .sort((a, b) => a - b)
               .slice(0, 10),
+            optimisticDate: this._optimisticDate,
+            currentDate: currentDate,
+            isOptimisticDateValid: isOptimisticDateValid,
+            showDayTabs: this._config.show_day_tabs,
+            activeTab: this._config.show_day_tabs ? this._activeTab : 'N/A',
           }
-        : 'undefined (using backend)'
+        : {
+            reason: 'using backend',
+            hasLocalChanges: hasLocalChanges,
+            isOptimisticDateValid: isOptimisticDateValid,
+          }
     );
 
-    const slots = generateTimeSlots(attributes, currentSlot, displaySlots);
+    // Use different slot generation for tabs vs normal view
+    const slots = this._config.show_day_tabs
+      ? this._getAllSlotsForDay(attributes, currentSlot, this._activeTab, displaySlots)
+      : generateTimeSlots(attributes, currentSlot, displaySlots);
+
     console.log(
       'Generated slots sample (first 5):',
       slots.slice(0, 5).map((s) => ({
         index: s.index,
         time: s.time,
         isSelected: s.isSelected,
+        isPast: s.isPast,
       }))
     );
     console.groupEnd();
 
-    // Calculate price statistics from visible slots
-    const priceStats = calculatePriceStats(slots);
+    const displayedSlots = slots;
 
-    const hourGroups = groupSlotsByHour(slots);
+    // Calculate price statistics from visible slots
+    const priceStats = calculatePriceStats(displayedSlots);
+
+    const hourGroups = groupSlotsByHour(displayedSlots);
 
     const cardName = this._config.name || attributes.scheduler_name || 'Nordpool Scheduler';
 
@@ -684,9 +917,9 @@ export class NordpoolSchedulerCard extends LitElement {
           priceStats.max,
           priceStats.avg
         )}
-        ${this._renderHistoryBar()}
+        ${this._renderHistoryBar()} ${this._config.show_day_tabs ? this._renderDayTabs() : ''}
 
-        <div class="schedule-grid ${this._config.compact_view ? 'compact' : ''}">
+        <div class="schedule-grid compact">
           ${hourGroups.map((hourSlots) => {
             return html`${hourSlots.map((slot) =>
               this._renderSlot(slot, priceStats.min, priceStats.max, priceStats.avg)
