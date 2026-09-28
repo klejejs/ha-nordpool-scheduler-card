@@ -85,20 +85,20 @@ export function priceTier(
   return 'low';
 }
 
-/** The state a click on this slot should request next; "default" clears the override. */
+/**
+ * The state a click on this slot should request next: no override -> "on"
+ * override -> "off" override -> no override, regardless of the scheduler's
+ * default state (see README's slot-click cycle).
+ */
 export function nextSlotState(
   slot: SlotSnapshot,
-  pendingState: SetSlotState | undefined,
-  defaultState: 'on' | 'off'
+  pendingState: SetSlotState | undefined
 ): SetSlotState {
-  const effectiveNow =
-    pendingState === undefined
-      ? slot.effective
-      : pendingState === 'default'
-        ? defaultState
-        : pendingState;
-  const requested = effectiveNow === 'on' ? 'off' : 'on';
-  return requested === defaultState ? 'default' : requested;
+  const current = pendingState ?? slot.override ?? 'default';
+  if (current === 'default') {
+    return 'on';
+  }
+  return current === 'on' ? 'off' : 'default';
 }
 
 /** Build the slots to render for one local calendar day, applying pending clicks. */

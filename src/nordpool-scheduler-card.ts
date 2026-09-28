@@ -52,6 +52,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _pending = new Map<string, SetSlotState>();
 
+  private _pendingRequestId = new Map<string, number>();
+
+  private _requestCounter = 0;
+
   private _subscribedEntity?: string;
 
   private _unsubscribe?: UnsubscribeFunc;
@@ -59,6 +63,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   private _historyEntity?: string;
 
   private _unsubscribeHistory?: UnsubscribeFunc;
+
+  private _historyTimer?: ReturnType<typeof setInterval>;
 
   private _historyAccumulator = new HistoryAccumulator();
 
@@ -123,9 +129,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._unsubscribe?.();
     this._unsubscribe = undefined;
     this._subscribedEntity = undefined;
-    this._unsubscribeHistory?.();
-    this._unsubscribeHistory = undefined;
-    this._historyEntity = undefined;
+    this._teardownHistorySubscription();
   }
 
   protected updated(changed: PropertyValues): void {
@@ -136,7 +140,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (this._subscribedEntity !== this._config.entity) {
       this._subscribe();
     }
-    if (this._data && this._config.show_history) {
+    if (this._data) {
       this._ensureHistorySubscription();
     }
   }
@@ -148,31 +152,47 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._error = undefined;
     const entityId = this._config!.entity!;
     this._subscribedEntity = entityId;
-    this.hass!.connection.subscribeMessage<ScheduleSnapshot>((data) => this._onSnapshot(data), {
-      type: 'nordpool_scheduler/subscribe',
-      entity_id: entityId,
-    })
+    this.hass!.connection.subscribeMessage<ScheduleSnapshot>(
+      (data) => this._onSnapshot(entityId, data),
+      {
+        type: 'nordpool_scheduler/subscribe',
+        entity_id: entityId,
+      }
+    )
       .then((unsub) => {
+        if (this._subscribedEntity !== entityId) {
+          // The config changed again before this subscription resolved; it's
+          // already stale, so drop it instead of overwriting the current one.
+          unsub();
+          return;
+        }
         this._unsubscribe = unsub;
       })
       .catch((err: unknown) => {
-        this._error = errorMessage(err);
+        if (this._subscribedEntity === entityId) {
+          this._error = errorMessage(err);
+        }
       });
   }
 
-  private _onSnapshot(data: ScheduleSnapshot): void {
+  private _onSnapshot(entityId: string, data: ScheduleSnapshot): void {
+    if (this._subscribedEntity !== entityId) {
+      return;
+    }
     this._error = undefined;
     this._data = data;
     for (const [start, requested] of this._pending) {
       const slot = data.slots.find((s) => s.start === start);
       if (!slot) {
         this._pending.delete(start);
+        this._pendingRequestId.delete(start);
         continue;
       }
       const confirmed =
         requested === 'default' ? slot.override === null : slot.override === requested;
       if (confirmed) {
         this._pending.delete(start);
+        this._pendingRequestId.delete(start);
       }
     }
     const dateKeys = availableDateKeys(data);
@@ -182,14 +202,18 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _ensureHistorySubscription(): void {
+    if (!this._config?.show_history) {
+      this._teardownHistorySubscription();
+      return;
+    }
     if (!this._data || !this.hass) {
       return;
     }
-    const entityId = this._config?.history_entity || this._data.target_entity;
+    const entityId = this._config.history_entity || this._data.target_entity;
     if (this._historyEntity === entityId) {
       return;
     }
-    this._unsubscribeHistory?.();
+    this._teardownHistorySubscription();
     this._historyEntity = entityId;
     this._historyAccumulator = new HistoryAccumulator();
     this._historySegments = [];
@@ -215,6 +239,22 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       .catch(() => {
         // History is a nice-to-have; leave the bar empty on failure.
       });
+    // No new stream message arrives while the target's state is unchanged,
+    // so the last segment's end (rendered as "now") would otherwise freeze.
+    this._historyTimer = setInterval(() => {
+      this._historySegments = this._historyAccumulator.segments();
+    }, 60000);
+  }
+
+  private _teardownHistorySubscription(): void {
+    this._unsubscribeHistory?.();
+    this._unsubscribeHistory = undefined;
+    this._historyEntity = undefined;
+    if (this._historyTimer !== undefined) {
+      clearInterval(this._historyTimer);
+      this._historyTimer = undefined;
+    }
+    this._historySegments = [];
   }
 
   private _onSlotClick(slot: RenderSlot): void {
@@ -225,8 +265,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!raw) {
       return;
     }
-    const requested = nextSlotState(raw, this._pending.get(slot.start), this._data.default_state);
+    const requested = nextSlotState(raw, this._pending.get(slot.start));
     this._pending.set(slot.start, requested);
+    const requestId = ++this._requestCounter;
+    this._pendingRequestId.set(slot.start, requestId);
     this.requestUpdate();
 
     this.hass
@@ -235,7 +277,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         slots: [{ start: slot.start, state: requested }],
       })
       .catch((err: unknown) => {
+        if (this._pendingRequestId.get(slot.start) !== requestId) {
+          // A newer click for this slot has already superseded this request.
+          return;
+        }
         this._pending.delete(slot.start);
+        this._pendingRequestId.delete(slot.start);
         this._actionError = `Could not update ${slot.time}: ${errorMessage(err)}`;
         this.requestUpdate();
       });
@@ -248,7 +295,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (this._error) {
       return html`<ha-card
         >${this._renderHeader()}
-        <ha-alert alert-type="error">Entity "${this._config.entity}" is unavailable.</ha-alert>
+        <ha-alert alert-type="error"
+          >Could not load "${this._config.entity}": ${this._error}</ha-alert
+        >
       </ha-card>`;
     }
     if (!this._data) {
