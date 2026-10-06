@@ -1,9 +1,11 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - published
+
+permissions: {}
 
 jobs:
   release:
@@ -20,8 +22,8 @@ jobs:
       - run: yarn lint
       - run: yarn build
         env:
-          CARD_VERSION: ${{ github.ref_name }}
-      - uses: softprops/action-gh-release@v2
+          CARD_VERSION: ${{ github.event.release.tag_name }}
+      - name: Attach the card to the release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/nordpool-scheduler-card.js
-          generate_release_notes: true

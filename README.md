@@ -76,7 +76,13 @@ Point a dashboard's Lovelace resource at `http://<dev-machine>:5005/nordpool-sch
 
 ## Releasing
 
-Push a tag such as `v2.1.0`. The release workflow builds the card with that version, which the card logs to the browser console, and publishes a GitHub release with `nordpool-scheduler-card.js` attached. The version isn't stored anywhere in the code.
+Releases are made only through GitHub Releases. Pushing a tag on its own builds nothing.
+
+Release Drafter keeps a draft release up to date on every merge to `main`. Its tag is the next minor version, or the next major one if a merged PR carries the `major` label. Its notes are grouped by PR label: `dependencies` (Renovate branches), `bug` (titles starting with "Fix") and `feature` (everything else). The labels are applied automatically when a PR opens, so relabel a PR before merging if it guessed wrong.
+
+To release, publish that draft from the GitHub UI. If it should be a different version, change the tag, the release title and the "Full Changelog" link at the bottom of the notes together. The draft only fills them in once, so editing the tag alone leaves the other two pointing at the old version. The first release has no earlier one to count from, so set its version by hand.
+
+Publishing runs the release workflow, which builds the card with the release's tag as its version and attaches `nordpool-scheduler-card.js` to the release. The card logs the version to the browser console. The version isn't stored anywhere in the code.
 
 ## License
 
