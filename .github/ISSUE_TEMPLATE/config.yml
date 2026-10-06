@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Problem with scheduling or prices
+    url: https://github.com/klejejs/ha-nordpool-scheduler-integration/issues
+    about: If the entity switches at the wrong time or prices are wrong, report it on the integration instead.

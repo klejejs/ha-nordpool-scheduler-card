@@ -1,24 +1,35 @@
 # Nordpool Scheduler Card
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+[![GitHub Release](https://img.shields.io/github/v/release/klejejs/ha-nordpool-scheduler-card)](https://github.com/klejejs/ha-nordpool-scheduler-card/releases)
+[![CI](https://github.com/klejejs/ha-nordpool-scheduler-card/actions/workflows/ci.yml/badge.svg)](https://github.com/klejejs/ha-nordpool-scheduler-card/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/klejejs/ha-nordpool-scheduler-card)](LICENSE)
+
 A Lovelace card for the [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration. Shows Nord Pool prices in 15-minute slots and lets you click a slot to turn the scheduled entity on or off for that slot.
+
+![The card showing tomorrow's slots, with cheap slots in green and a run of slots scheduled on](docs/screenshot.png)
+
+## Prerequisites
+
+The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry. This card reads and writes through it — it doesn't talk to Nord Pool directly.
 
 ## Installation
 
 ### HACS
 
-1. HACS → Frontend → the three-dot menu → Custom repositories
-2. Add this repository as a Lovelace/Dashboard resource
-3. Install "Nordpool Scheduler Card"
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=klejejs&repository=ha-nordpool-scheduler-card&category=plugin)
+
+Or by hand:
+
+1. HACS → the three-dot menu → **Custom repositories**
+2. Add `https://github.com/klejejs/ha-nordpool-scheduler-card` with the category **Dashboard**
+3. Install **Nordpool Scheduler Card**. HACS adds the dashboard resource for you.
 
 ### Manual
 
 1. Download `nordpool-scheduler-card.js` from the latest release
 2. Copy it to `config/www/nordpool-scheduler-card.js`
 3. Settings → Dashboards → Resources → add `/local/nordpool-scheduler-card.js` as a JavaScript module
-
-## Prerequisites
-
-The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry. This card reads and writes through it — it doesn't talk to Nord Pool directly.
 
 ## Configuration
 
