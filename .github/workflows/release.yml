@@ -1,9 +1,11 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - published
+
+permissions: {}
 
 jobs:
   release:
@@ -11,15 +13,17 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: "yarn"
       - run: yarn install --frozen-lockfile
       - run: yarn lint
       - run: yarn build
-      - uses: softprops/action-gh-release@v2
+        env:
+          CARD_VERSION: ${{ github.event.release.tag_name }}
+      - name: Attach the card to the release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/nordpool-scheduler-card.js
-          generate_release_notes: true
