@@ -19,6 +19,8 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn lint
       - run: yarn build
+        env:
+          CARD_VERSION: ${{ github.ref_name }}
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/nordpool-scheduler-card.js

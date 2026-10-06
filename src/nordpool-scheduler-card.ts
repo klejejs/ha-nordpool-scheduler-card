@@ -26,9 +26,10 @@ import {
 import { HistoryAccumulator } from './history';
 import { sharedStyles } from './styles';
 
-const VERSION = '2.0.0';
+declare const __CARD_VERSION__: string;
+
 console.info(
-  `%c NORDPOOL-SCHEDULER-CARD %c v${VERSION} `,
+  `%c NORDPOOL-SCHEDULER-CARD %c ${__CARD_VERSION__} `,
   'color: white; background: #03a9f4; font-weight: 700;',
   'color: #03a9f4; background: white; font-weight: 700;'
 );

@@ -74,6 +74,10 @@ yarn format
 
 Point a dashboard's Lovelace resource at `http://<dev-machine>:5005/nordpool-scheduler-card.js` while `yarn start` is running to iterate against a real Home Assistant instance.
 
+## Releasing
+
+Push a tag such as `v2.1.0`. The release workflow builds the card with that version, which the card logs to the browser console, and publishes a GitHub release with `nordpool-scheduler-card.js` attached. The version isn't stored anywhere in the code.
+
 ## License
 
 MIT — see LICENSE.
