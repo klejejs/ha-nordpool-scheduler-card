@@ -162,6 +162,18 @@ export const sharedStyles = css`
     color: var(--primary-text-color);
   }
 
+  .info-hint {
+    font-size: 0.7em;
+    color: var(--secondary-text-color);
+  }
+
+  .averages-title {
+    display: block;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    color: var(--secondary-text-color);
+  }
+
   .day-tabs {
     display: flex;
     gap: 4px;

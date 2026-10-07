@@ -44,6 +44,7 @@ show_history: true
 show_day_tabs: false
 history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
 prices_only: false
+averages: [today, week, month, year]
 ```
 
 | Option | Type | Default | Description |
@@ -55,6 +56,7 @@ prices_only: false
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
 | `history_entity` | string | the scheduler's target entity | Entity the history bar tracks |
 | `prices_only` | boolean | `false` | Only show prices: slots can't be clicked, and auto mode, the override count and the history bar are hidden |
+| `averages` | list | all four | Which average prices to show: `today`, `week`, `month`, `year`. `[]` hides the row |
 
 ## Usage
 
@@ -75,6 +77,10 @@ The border shows what the slot will actually do: a thick blue border means the e
 Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
 
 The info bar counts the upcoming auto picks and your overrides while auto mode is on, and your overrides alone while it is off.
+
+### Average price
+
+The row under the info bar shows the average price while the entity was on so far today, this week, this month and this year, with how many hours it ran. For a prices-only entry it is the plain average price over the same periods. Pick which ones to show with `averages`. The values come from the integration's average price sensors, so the row needs a version of the integration that has them.
 
 To show prices on a dashboard without scheduling anything, add a **Prices only** entry in the integration and point the card at its price sensor. That entry controls no entity, so the card shows it as if `prices_only` were set.
 
