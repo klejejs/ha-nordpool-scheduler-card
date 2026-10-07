@@ -46,11 +46,6 @@ export interface HaFormSchema {
   default?: unknown;
 }
 
-export interface LovelaceCardEditor extends HTMLElement {
-  hass?: HomeAssistant;
-  setConfig(config: LovelaceCardConfig): void;
-}
-
 /** Card configuration, as stored in the dashboard YAML/storage. */
 export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   type: string;
@@ -59,7 +54,6 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_name?: boolean;
   show_history?: boolean;
   show_day_tabs?: boolean;
-  history_entity?: string;
   /** Average prices to leave out of the row; unset shows them all. */
   hide_averages?: AverageWindow[];
 }
