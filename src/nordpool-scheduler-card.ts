@@ -65,6 +65,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _unsubscribeHistory?: UnsubscribeFunc;
 
+  private _historyRequestId = 0;
+
   private _historyTimer?: ReturnType<typeof setInterval>;
 
   private _historyAccumulator = new HistoryAccumulator();
@@ -235,9 +237,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._historyAccumulator = new HistoryAccumulator();
     this._historySegments = [];
     const startTime = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000);
+    const requestId = ++this._historyRequestId;
     this.hass.connection
       .subscribeMessage<HistoryStreamMessage>(
         (msg) => {
+          if (requestId !== this._historyRequestId) {
+            return;
+          }
           this._historyAccumulator.addMessage(msg, entityId, HISTORY_HOURS);
           this._historySegments = this._historyAccumulator.segments();
         },
@@ -251,6 +257,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         }
       )
       .then((unsub) => {
+        if (requestId !== this._historyRequestId) {
+          // Torn down before the subscription resolved; don't leave it open.
+          unsub();
+          return;
+        }
         this._unsubscribeHistory = unsub;
       })
       .catch(() => {
@@ -264,6 +275,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _teardownHistorySubscription(): void {
+    this._historyRequestId++;
     this._unsubscribeHistory?.();
     this._unsubscribeHistory = undefined;
     this._historyEntity = undefined;
