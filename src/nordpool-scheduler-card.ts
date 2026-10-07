@@ -38,6 +38,8 @@ console.info(
 
 const HISTORY_HOURS = 24;
 
+type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
+
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
@@ -285,20 +287,28 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       });
   }
 
-  private _toggleAuto(): void {
+  private _toggleAuto(checkbox?: HTMLInputElement): void {
     const entity = this._data?.auto.switch_entity;
     if (!entity || !this.hass) {
       return;
     }
-    this.hass
-      .callService('switch', 'toggle', { entity_id: entity })
-      .catch((err: unknown) => {
-        this._actionError = `Could not switch auto mode: ${errorMessage(err)}`;
-      });
+    this.hass.callService('switch', 'toggle', { entity_id: entity }).catch((err: unknown) => {
+      // Lit won't re-set an unchanged .checked, so put the box back by hand.
+      if (checkbox && this._data) {
+        checkbox.checked = this._data.auto.enabled;
+      }
+      this._actionError = `Could not switch auto mode: ${errorMessage(err)}`;
+    });
   }
 
-  private _setAutoSetting(entity: string | null, label: string, ev: Event): void {
+  private _setAutoSetting(
+    entity: string | null,
+    setting: AutoSetting,
+    label: string,
+    ev: Event
+  ): void {
     const input = ev.target as HTMLInputElement;
+    const attempted = input.value;
     const value = input.valueAsNumber;
     if (!entity || !this.hass || Number.isNaN(value)) {
       return;
@@ -306,6 +316,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this.hass
       .callService('number', 'set_value', { entity_id: entity, value })
       .catch((err: unknown) => {
+        // Lit won't re-set an unchanged .value; leave a newer edit alone.
+        if (this._data && input.value === attempted) {
+          input.value = String(this._data.auto[setting]);
+        }
         this._actionError = `Could not set ${label}: ${errorMessage(err)}`;
       });
   }
@@ -393,8 +407,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ?disabled=${!auto.switch_entity}
         @click=${() => this._toggleAuto()}
       >
-        ${robotIcon('chip-icon')}
-        ${auto.enabled ? `Auto · ${hours} h/day` : 'Auto off'}
+        ${robotIcon('chip-icon')} ${auto.enabled ? `Auto · ${hours} h/day` : 'Auto off'}
       </button>
       <button
         class="icon-button ${this._showSettings ? 'active' : ''}"
@@ -415,7 +428,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           type="checkbox"
           .checked=${auto.enabled}
           ?disabled=${!auto.switch_entity}
-          @change=${() => this._toggleAuto()}
+          @change=${(ev: Event) => this._toggleAuto(ev.target as HTMLInputElement)}
         />
       </label>
       <label class="setting">
@@ -427,7 +440,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           step="0.25"
           .value=${String(auto.run_hours)}
           ?disabled=${!auto.run_hours_entity}
-          @change=${(ev: Event) => this._setAutoSetting(auto.run_hours_entity, 'hours per day', ev)}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.run_hours_entity, 'run_hours', 'hours per day', ev)}
         />
       </label>
       <label class="setting">
@@ -439,7 +453,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           step="0.01"
           .value=${String(auto.max_price)}
           ?disabled=${!auto.max_price_entity}
-          @change=${(ev: Event) => this._setAutoSetting(auto.max_price_entity, 'max price', ev)}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.max_price_entity, 'max_price', 'max price', ev)}
         />
         <span class="setting-hint">Skip picks above this. 0 = off</span>
       </label>
@@ -452,7 +467,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           step="0.01"
           .value=${String(auto.cheap_price)}
           ?disabled=${!auto.cheap_price_entity}
-          @change=${(ev: Event) => this._setAutoSetting(auto.cheap_price_entity, 'cheap price', ev)}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.cheap_price_entity, 'cheap_price', 'cheap price', ev)}
         />
         <span class="setting-hint">Always run at or below this. 0 = off</span>
       </label>
@@ -611,13 +627,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     ]
       .filter(Boolean)
       .join(' ');
+    const price = formatPrice(slot.price, this.hass!.locale.language);
     const title = [
       slot.time,
+      price,
       slot.effective === 'on' ? 'runs' : 'off',
-      slot.isOverridden ? '(your override)' : slot.isAutoPick ? '(auto pick)' : '',
+      slot.isAutoPick ? 'auto pick' : '',
+      slot.isOverridden ? 'your override' : '',
     ]
       .filter(Boolean)
-      .join(' ');
+      .join(', ');
     return html`
       <div
         class=${classes}
@@ -636,7 +655,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ${slot.isAutoPick ? robotIcon('slot-marker auto-marker') : nothing}
         ${slot.isOverridden ? handIcon('slot-marker override-marker') : nothing}
         <div class="time-label">${slot.time}</div>
-        <div class="price-label">${formatPrice(slot.price, this.hass!.locale.language)}</div>
+        <div class="price-label">${price}</div>
       </div>
     `;
   }

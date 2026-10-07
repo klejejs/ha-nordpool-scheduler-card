@@ -303,7 +303,7 @@ export const sharedStyles = css`
     fill: var(--np-auto-color);
   }
 
-  .time-slot.auto-pick.overridden .auto-marker {
+  .time-slot.auto-pick.overridden:not(.on) .auto-marker {
     opacity: 0.35;
   }
 
