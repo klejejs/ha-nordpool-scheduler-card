@@ -9,6 +9,7 @@ export interface HomeAssistant {
   states: Record<string, HassEntity>;
   connection: Connection;
   locale: { language: string };
+  localize(key: string): string;
   callService(
     domain: string,
     service: string,
@@ -45,8 +46,9 @@ export interface HaFormSchema {
   default?: unknown;
 }
 
-export interface LovelaceConfigForm {
-  schema: HaFormSchema[];
+export interface LovelaceCardEditor extends HTMLElement {
+  hass?: HomeAssistant;
+  setConfig(config: LovelaceCardConfig): void;
 }
 
 /** Card configuration, as stored in the dashboard YAML/storage. */

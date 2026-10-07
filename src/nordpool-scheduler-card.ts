@@ -9,7 +9,7 @@ import type {
   HistoryStreamMessage,
   HomeAssistant,
   LovelaceCard,
-  LovelaceConfigForm,
+  LovelaceCardEditor,
   LovelaceGridOptions,
   NordpoolSchedulerCardConfig,
   RenderSlot,
@@ -17,6 +17,8 @@ import type {
   SetSlotState,
 } from './types';
 import {
+  AVERAGE_LABELS,
+  AVERAGE_WINDOWS,
   buildRenderSlots,
   calculatePriceStats,
   formatDayHeading,
@@ -25,6 +27,7 @@ import {
   nextSlotState,
   priceTier,
 } from './format';
+import { isPriceSensor, loadHaForm } from './editor';
 import { HistoryAccumulator } from './history';
 import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
@@ -38,14 +41,6 @@ console.info(
 );
 
 const HISTORY_HOURS = 24;
-
-const AVERAGE_LABELS: Record<AverageWindow, string> = {
-  today: 'Today',
-  week: 'This week',
-  month: 'This month',
-  year: 'This year',
-};
-const AVERAGE_WINDOWS = Object.keys(AVERAGE_LABELS) as AverageWindow[];
 
 type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
 
@@ -89,42 +84,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   private _historyAccumulator = new HistoryAccumulator();
 
   public static getStubConfig(hass: HomeAssistant): NordpoolSchedulerCardConfig {
-    const entity = Object.keys(hass.states).find(
-      (id) => id.startsWith('sensor.') && hass.states[id].attributes.vat_percent !== undefined
-    );
+    const entity = Object.keys(hass.states).find((id) => isPriceSensor(hass, id));
     return { type: 'custom:nordpool-scheduler-card', entity: entity ?? '', show_name: true };
   }
 
-  public static getConfigForm(): LovelaceConfigForm {
-    return {
-      schema: [
-        {
-          name: 'entity',
-          required: true,
-          selector: { entity: { filter: { integration: 'nordpool_scheduler', domain: 'sensor' } } },
-        },
-        { name: 'name', selector: { text: {} } },
-        { name: 'show_name', default: true, selector: { boolean: {} } },
-        { name: 'show_day_tabs', selector: { boolean: {} } },
-        { name: 'show_history', default: true, selector: { boolean: {} } },
-        {
-          name: 'hide_averages',
-          selector: {
-            select: {
-              multiple: true,
-              mode: 'list',
-              options: AVERAGE_WINDOWS.map((value) => ({ value, label: AVERAGE_LABELS[value] })),
-            },
-          },
-        },
-        {
-          name: 'history_entity',
-          selector: {
-            entity: { filter: { integration: 'nordpool_scheduler', domain: 'binary_sensor' } },
-          },
-        },
-      ],
-    };
+  public static async getConfigElement(): Promise<LovelaceCardEditor> {
+    await loadHaForm();
+    return document.createElement('nordpool-scheduler-card-editor') as LovelaceCardEditor;
   }
 
   public getGridOptions(): LovelaceGridOptions {
