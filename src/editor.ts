@@ -77,7 +77,6 @@ export class NordpoolSchedulerCardEditor extends LitElement {
   }
 
   private _schema(): HaFormSchema[] {
-    const pricesOnly = Boolean(this._config?.prices_only) || this._targetEntity === null;
     return [
       {
         name: 'entity',
@@ -86,9 +85,10 @@ export class NordpoolSchedulerCardEditor extends LitElement {
       },
       { name: 'name', selector: { text: {} } },
       { name: 'show_name', default: true, selector: { boolean: {} } },
-      { name: 'prices_only', selector: { boolean: {} } },
       { name: 'show_day_tabs', selector: { boolean: {} } },
-      ...(pricesOnly ? [] : [{ name: 'show_history', default: true, selector: { boolean: {} } }]),
+      ...(this._targetEntity === null
+        ? []
+        : [{ name: 'show_history', default: true, selector: { boolean: {} } }]),
       {
         name: 'hide_averages',
         selector: {
