@@ -105,7 +105,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public getCardSize(): number {
-    return this._shownAverages().length > 0 ? 7 : 6;
+    const size = this._compact ? 4 : 6;
+    return this._shownAverages().length > 0 ? size + 1 : size;
   }
 
   public setConfig(config: NordpoolSchedulerCardConfig): void {
@@ -113,6 +114,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       throw new Error('Entity must be specified');
     }
     this._config = { show_name: true, show_history: true, ...config };
+    this.toggleAttribute('compact', this._compact);
+  }
+
+  private get _compact(): boolean {
+    return this._config?.compact === true;
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
@@ -681,7 +687,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
     const tier = priceTier(slot.price, stats);
-    const price = formatPrice(slot.price, this.hass!.locale.language);
+    const locale = this.hass!.locale.language;
+    const price = formatPrice(slot.price, locale);
+    const priceLabel = formatPrice(slot.price, locale, !this._compact);
     if (this._pricesOnly) {
       const classes = [
         'time-slot',
@@ -695,7 +703,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       return html`
         <div class=${classes}>
           <div class="time-label">${slot.time}</div>
-          <div class="price-label">${price}</div>
+          <div class="price-label">${priceLabel}</div>
         </div>
       `;
     }
@@ -738,7 +746,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ${slot.isAutoPick ? robotIcon('slot-marker auto-marker') : nothing}
         ${slot.isOverridden ? handIcon('slot-marker override-marker') : nothing}
         <div class="time-label">${slot.time}</div>
-        <div class="price-label">${price}</div>
+        <div class="price-label">${priceLabel}</div>
       </div>
     `;
   }

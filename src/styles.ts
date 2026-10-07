@@ -379,4 +379,130 @@ export const sharedStyles = css`
     font-size: 0.85em;
     padding: calc(var(--np-spacing) * 2) 0;
   }
+
+  :host([compact]) {
+    --np-spacing: 4px;
+    --np-radius: 6px;
+  }
+
+  :host([compact]) ha-card {
+    padding: 8px;
+  }
+
+  :host([compact]) .card-title {
+    font-size: 1em;
+  }
+
+  :host([compact]) .auto-chip {
+    padding: 2px 8px;
+    font-size: 0.75em;
+  }
+
+  :host([compact]) .icon-button {
+    padding: 2px;
+  }
+
+  :host([compact]) .settings {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+
+  :host([compact]) .info-bar {
+    gap: 2px;
+    padding: 0;
+  }
+
+  :host([compact]) .info-label,
+  :host([compact]) .averages-title,
+  :host([compact]) .info-hint {
+    font-size: 0.6em;
+  }
+
+  :host([compact]) .info-value {
+    font-size: 0.8em;
+  }
+
+  :host([compact]) .day-tab {
+    padding: 4px;
+    font-size: 0.85em;
+  }
+
+  :host([compact]) .day-heading {
+    font-size: 0.8em;
+    margin: var(--np-spacing) 0 2px;
+  }
+
+  :host([compact]) .history-label {
+    font-size: 0.65em;
+    margin-bottom: 2px;
+  }
+
+  :host([compact]) .history-bar {
+    height: 6px;
+  }
+
+  :host([compact]) .schedule-grid {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+  }
+
+  :host([compact]) .time-slot {
+    aspect-ratio: auto;
+    gap: 0;
+    padding: 3px 1px;
+    border-width: 1px;
+  }
+
+  :host([compact]) .time-slot.on {
+    border-width: 2px;
+  }
+
+  :host([compact]) .time-label {
+    font-size: 0.65em;
+  }
+
+  :host([compact]) .price-label {
+    font-size: 0.6em;
+  }
+
+  :host([compact]) .slot-marker {
+    top: 0;
+    width: 8px;
+    height: 8px;
+  }
+
+  :host([compact]) .auto-marker {
+    left: 0;
+  }
+
+  :host([compact]) .override-marker {
+    right: 0;
+  }
+
+  :host([compact]) .time-slot.on .slot-marker {
+    top: -1px;
+  }
+
+  :host([compact]) .time-slot.on .auto-marker {
+    left: -1px;
+  }
+
+  :host([compact]) .time-slot.on .override-marker {
+    right: -1px;
+  }
+
+  :host([compact]) .legend {
+    gap: 8px;
+    font-size: 0.65em;
+  }
+
+  :host([compact]) .legend-icon {
+    width: 10px;
+    height: 10px;
+  }
+
+  :host([compact]) .legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-width: 2px;
+  }
 `;
