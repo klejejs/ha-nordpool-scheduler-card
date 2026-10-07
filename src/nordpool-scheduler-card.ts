@@ -9,7 +9,6 @@ import type {
   HistoryStreamMessage,
   HomeAssistant,
   LovelaceCard,
-  LovelaceConfigForm,
   LovelaceGridOptions,
   NordpoolSchedulerCardConfig,
   RenderSlot,
@@ -17,6 +16,8 @@ import type {
   SetSlotState,
 } from './types';
 import {
+  AVERAGE_LABELS,
+  AVERAGE_WINDOWS,
   buildRenderSlots,
   calculatePriceStats,
   formatDayHeading,
@@ -25,6 +26,7 @@ import {
   nextSlotState,
   priceTier,
 } from './format';
+import './editor';
 import { HistoryAccumulator } from './history';
 import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
@@ -38,14 +40,6 @@ console.info(
 );
 
 const HISTORY_HOURS = 24;
-
-const AVERAGE_LABELS: Record<AverageWindow, string> = {
-  today: 'Today',
-  week: 'This week',
-  month: 'This month',
-  year: 'This year',
-};
-const AVERAGE_WINDOWS = Object.keys(AVERAGE_LABELS) as AverageWindow[];
 
 type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
 
@@ -95,36 +89,15 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     return { type: 'custom:nordpool-scheduler-card', entity: entity ?? '', show_name: true };
   }
 
-  public static getConfigForm(): LovelaceConfigForm {
-    return {
-      schema: [
-        {
-          name: 'entity',
-          required: true,
-          selector: { entity: { filter: { integration: 'nordpool_scheduler', domain: 'sensor' } } },
-        },
-        { name: 'name', selector: { text: {} } },
-        { name: 'show_name', default: true, selector: { boolean: {} } },
-        { name: 'show_day_tabs', selector: { boolean: {} } },
-        { name: 'show_history', default: true, selector: { boolean: {} } },
-        {
-          name: 'hide_averages',
-          selector: {
-            select: {
-              multiple: true,
-              mode: 'list',
-              options: AVERAGE_WINDOWS.map((value) => ({ value, label: AVERAGE_LABELS[value] })),
-            },
-          },
-        },
-        {
-          name: 'history_entity',
-          selector: {
-            entity: { filter: { integration: 'nordpool_scheduler', domain: 'binary_sensor' } },
-          },
-        },
-      ],
-    };
+  public static async getConfigElement(): Promise<HTMLElement> {
+    // The editor is built on ha-form, which the frontend loads with its own card editors.
+    if (!customElements.get('ha-form')) {
+      const entitiesCard = customElements.get('hui-entities-card') as
+        | (CustomElementConstructor & { getConfigElement(): Promise<unknown> })
+        | undefined;
+      await entitiesCard?.getConfigElement();
+    }
+    return document.createElement('nordpool-scheduler-card-editor');
   }
 
   public getGridOptions(): LovelaceGridOptions {
@@ -245,7 +218,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!this._data || !this.hass) {
       return;
     }
-    const entityId = this._config!.history_entity || this._data.target_entity;
+    const entityId = this._data.target_entity;
     if (!entityId || this._historyEntity === entityId) {
       return;
     }
@@ -634,7 +607,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               100,
               ((segment.end.getTime() - windowStart) / totalDuration) * 100
             );
-            const cls = segment.state === 'on' ? 'on' : 'off';
+            const cls = isRunning(segment.state) ? 'on' : 'off';
             return html`<div
               class="history-segment ${cls}"
               style="left: ${left}%; width: ${right - left}%"
@@ -773,6 +746,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   static get styles() {
     return sharedStyles;
   }
+}
+
+/** Whether a target state counts as on, by the same rule as the integration's is_running. */
+function isRunning(state: string): boolean {
+  return !['off', 'unavailable', 'unknown'].includes(state);
 }
 
 function errorMessage(err: unknown): string {

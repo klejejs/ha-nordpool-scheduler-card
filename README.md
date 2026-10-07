@@ -42,7 +42,6 @@ name: Boiler # optional, defaults to the entity's name
 show_name: true
 show_history: true
 show_day_tabs: false
-history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
 hide_averages: [] # e.g. [week, year]
 ```
 
@@ -51,9 +50,8 @@ hide_averages: [] # e.g. [week, year]
 | `entity` | string | required | The scheduler's electricity price sensor |
 | `name` | string | entity name | Card title |
 | `show_name` | boolean | `true` | Show the card title |
-| `show_history` | boolean | `true` | Show a 24h on/off history bar |
+| `show_history` | boolean | `true` | Show a 24h on/off history bar of the scheduler's target entity |
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
-| `history_entity` | string | the scheduler's target entity | Entity the history bar tracks |
 | `hide_averages` | list | none | Average prices to leave out of the row: `today`, `week`, `month`, `year`. Listing all four hides the row |
 
 ## Usage
