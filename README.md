@@ -11,7 +11,7 @@ A Lovelace card for the [Nordpool Scheduler](https://github.com/klejejs/ha-nordp
 
 ## Prerequisites
 
-The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry. This card reads and writes through it — it doesn't talk to Nord Pool directly.
+The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry, or a prices-only entry if you only want to see prices. This card reads and writes through it — it doesn't talk to Nord Pool directly.
 
 ## Installation
 
@@ -44,6 +44,7 @@ show_history: true
 show_day_tabs: false
 history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
 price_unit: cents # "cents" or "currency"
+prices_only: false
 ```
 
 | Option | Type | Default | Description |
@@ -55,10 +56,13 @@ price_unit: cents # "cents" or "currency"
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
 | `history_entity` | string | the scheduler's target entity | Entity the history bar tracks |
 | `price_unit` | string | `cents` | Show prices as cents or in the source currency |
+| `prices_only` | boolean | `false` | Only show prices: slots can't be clicked, and the schedule, the Scheduled count and the history bar are hidden |
 
 ## Usage
 
 Click a slot to schedule the entity on for it; click an on slot to turn it off; click it a third time to remove the override and fall back to the scheduler's default state. A dot marks a slot with an explicit override — the border shows the state (on or off) that will actually apply, whether it comes from an override or the default.
+
+To show prices on a dashboard without scheduling anything, add a **Prices only** entry in the integration and point the card at its price sensor. That entry controls no entity, so the card shows it as if `prices_only` were set.
 
 Colors are relative to that day's own price range: green is cheap, red is expensive. A day with no published prices yet shows a placeholder instead of an empty grid.
 
