@@ -105,7 +105,6 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         },
         { name: 'name', selector: { text: {} } },
         { name: 'show_name', default: true, selector: { boolean: {} } },
-        { name: 'prices_only', selector: { boolean: {} } },
         { name: 'show_day_tabs', selector: { boolean: {} } },
         { name: 'show_history', default: true, selector: { boolean: {} } },
         {
@@ -140,12 +139,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!config?.entity) {
       throw new Error('Entity must be specified');
     }
-    this._config = { show_name: true, show_history: true, prices_only: false, ...config };
+    this._config = { show_name: true, show_history: true, ...config };
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
   private get _pricesOnly(): boolean {
-    return Boolean(this._config?.prices_only) || this._data?.target_entity === null;
+    return this._data?.target_entity === null;
   }
 
   private get _showHistory(): boolean {
