@@ -5,6 +5,7 @@ import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 import type {
   AutoSnapshot,
   AverageWindow,
+  Density,
   HistorySegment,
   HistoryStreamMessage,
   HomeAssistant,
@@ -103,7 +104,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public getCardSize(): number {
-    return this._shownAverages().length > 0 ? 7 : 6;
+    const size = { normal: 6, compact: 5, super_compact: 4 }[this._density];
+    return this._shownAverages().length > 0 ? size + 1 : size;
   }
 
   public setConfig(config: NordpoolSchedulerCardConfig): void {
@@ -111,6 +113,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       throw new Error('Entity must be specified');
     }
     this._config = { show_name: true, show_history: true, ...config };
+    if (this._density === 'normal') {
+      this.removeAttribute('density');
+    } else {
+      this.setAttribute('density', this._density);
+    }
+  }
+
+  private get _density(): Density {
+    const density = this._config?.density;
+    return density === 'compact' || density === 'super_compact' ? density : 'normal';
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
@@ -679,7 +691,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
     const tier = priceTier(slot.price, stats);
-    const price = formatPrice(slot.price, this.hass!.locale.language);
+    const locale = this.hass!.locale.language;
+    const price = formatPrice(slot.price, locale);
+    const priceLabel = formatPrice(slot.price, locale, this._density !== 'super_compact');
     if (this._pricesOnly) {
       const classes = [
         'time-slot',
@@ -693,7 +707,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       return html`
         <div class=${classes}>
           <div class="time-label">${slot.time}</div>
-          <div class="price-label">${price}</div>
+          <div class="price-label">${priceLabel}</div>
         </div>
       `;
     }
@@ -736,7 +750,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ${slot.isAutoPick ? robotIcon('slot-marker auto-marker') : nothing}
         ${slot.isOverridden ? handIcon('slot-marker override-marker') : nothing}
         <div class="time-label">${slot.time}</div>
-        <div class="price-label">${price}</div>
+        <div class="price-label">${priceLabel}</div>
       </div>
     `;
   }

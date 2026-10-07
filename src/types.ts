@@ -54,9 +54,12 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_name?: boolean;
   show_history?: boolean;
   show_day_tabs?: boolean;
+  density?: Density;
   /** Average prices to leave out of the row; unset shows them all. */
   hide_averages?: AverageWindow[];
 }
+
+export type Density = 'normal' | 'compact' | 'super_compact';
 
 export type SlotOverride = 'on' | 'off' | null;
 export type SlotState = 'on' | 'off';

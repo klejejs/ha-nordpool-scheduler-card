@@ -45,7 +45,7 @@ export function formatDayHeading(iso: string, timeZone: string, locale: string):
 }
 
 /** Format a price that is already in cents/kWh. */
-export function formatPrice(price: number | null, locale: string): string {
+export function formatPrice(price: number | null, locale: string, withUnit = true): string {
   if (price === null) {
     return '—';
   }
@@ -53,7 +53,7 @@ export function formatPrice(price: number | null, locale: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(price);
-  return `${formatted} c/kWh`;
+  return withUnit ? `${formatted} c/kWh` : formatted;
 }
 
 export interface PriceStats {

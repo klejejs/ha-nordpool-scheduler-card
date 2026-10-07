@@ -379,4 +379,151 @@ export const sharedStyles = css`
     font-size: 0.85em;
     padding: calc(var(--np-spacing) * 2) 0;
   }
+
+  :host([density]) {
+    --np-spacing: 4px;
+    --np-radius: 6px;
+  }
+
+  :host([density]) ha-card {
+    padding: 8px;
+  }
+
+  :host([density]) .card-title {
+    font-size: 1em;
+  }
+
+  :host([density]) .auto-chip {
+    padding: 2px 8px;
+    font-size: 0.75em;
+  }
+
+  :host([density]) .icon-button {
+    padding: 2px;
+  }
+
+  :host([density]) .settings {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+
+  :host([density]) .info-bar {
+    gap: 2px;
+    padding: 0;
+  }
+
+  :host([density]) .info-label,
+  :host([density]) .averages-title,
+  :host([density]) .info-hint {
+    font-size: 0.6em;
+  }
+
+  :host([density]) .info-value {
+    font-size: 0.8em;
+  }
+
+  :host([density]) .day-tab {
+    padding: 4px;
+    font-size: 0.85em;
+  }
+
+  :host([density]) .day-heading {
+    font-size: 0.8em;
+    margin: var(--np-spacing) 0 2px;
+  }
+
+  :host([density]) .history-label {
+    font-size: 0.65em;
+    margin-bottom: 2px;
+  }
+
+  :host([density]) .history-bar {
+    height: 6px;
+  }
+
+  :host([density]) .schedule-grid {
+    gap: 2px;
+  }
+
+  :host([density]) .time-slot {
+    aspect-ratio: auto;
+    gap: 0;
+    padding: 4px 2px;
+    border-width: 1px;
+  }
+
+  :host([density]) .time-slot.on {
+    border-width: 2px;
+  }
+
+  :host([density]) .slot-marker {
+    top: 1px;
+    width: 10px;
+    height: 10px;
+  }
+
+  :host([density]) .auto-marker {
+    left: 1px;
+  }
+
+  :host([density]) .override-marker {
+    right: 1px;
+  }
+
+  :host([density='super_compact']) .schedule-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+
+  :host([density='super_compact']) .time-slot {
+    padding: 3px 1px;
+  }
+
+  :host([density='super_compact']) .time-label {
+    font-size: 0.65em;
+  }
+
+  :host([density='super_compact']) .price-label {
+    font-size: 0.6em;
+  }
+
+  :host([density='super_compact']) .slot-marker {
+    top: 0;
+    width: 8px;
+    height: 8px;
+  }
+
+  :host([density='super_compact']) .auto-marker {
+    left: 0;
+  }
+
+  :host([density='super_compact']) .override-marker {
+    right: 0;
+  }
+
+  :host([density='super_compact']) .time-slot.on .slot-marker {
+    top: -1px;
+  }
+
+  :host([density='super_compact']) .time-slot.on .auto-marker {
+    left: -1px;
+  }
+
+  :host([density='super_compact']) .time-slot.on .override-marker {
+    right: -1px;
+  }
+
+  :host([density]) .legend {
+    gap: 8px;
+    font-size: 0.65em;
+  }
+
+  :host([density]) .legend-icon {
+    width: 10px;
+    height: 10px;
+  }
+
+  :host([density]) .legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-width: 2px;
+  }
 `;
