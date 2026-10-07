@@ -5,6 +5,7 @@ import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 import type {
   AutoSnapshot,
   AverageWindow,
+  Density,
   HistorySegment,
   HistoryStreamMessage,
   HomeAssistant,
@@ -105,7 +106,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public getCardSize(): number {
-    const size = this._compact ? 4 : 6;
+    const size = { normal: 6, compact: 5, super_compact: 4 }[this._density];
     return this._shownAverages().length > 0 ? size + 1 : size;
   }
 
@@ -114,11 +115,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       throw new Error('Entity must be specified');
     }
     this._config = { show_name: true, show_history: true, ...config };
-    this.toggleAttribute('compact', this._compact);
+    if (this._density === 'normal') {
+      this.removeAttribute('density');
+    } else {
+      this.setAttribute('density', this._density);
+    }
   }
 
-  private get _compact(): boolean {
-    return this._config?.compact === true;
+  private get _density(): Density {
+    const density = this._config?.density;
+    return density === 'compact' || density === 'super_compact' ? density : 'normal';
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
@@ -689,7 +695,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const tier = priceTier(slot.price, stats);
     const locale = this.hass!.locale.language;
     const price = formatPrice(slot.price, locale);
-    const priceLabel = formatPrice(slot.price, locale, !this._compact);
+    const priceLabel = formatPrice(slot.price, locale, this._density !== 'super_compact');
     if (this._pricesOnly) {
       const classes = [
         'time-slot',

@@ -4,11 +4,18 @@ import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import { AVERAGE_LABELS, AVERAGE_WINDOWS } from './format';
 import type {
+  Density,
   HaFormSchema,
   HomeAssistant,
   NordpoolSchedulerCardConfig,
   ScheduleSnapshot,
 } from './types';
+
+const DENSITY_OPTIONS: { value: Density; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'compact', label: 'Compact: one row per hour' },
+  { value: 'super_compact', label: 'Super compact: two hours per row' },
+];
 
 export class NordpoolSchedulerCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -92,7 +99,11 @@ export class NordpoolSchedulerCardEditor extends LitElement {
       { name: 'name', selector: { text: {} } },
       { name: 'show_name', default: true, selector: { boolean: {} } },
       { name: 'show_day_tabs', selector: { boolean: {} } },
-      { name: 'compact', selector: { boolean: {} } },
+      {
+        name: 'density',
+        default: 'normal',
+        selector: { select: { mode: 'dropdown', options: DENSITY_OPTIONS } },
+      },
       ...(this._targetEntity === null
         ? []
         : [{ name: 'show_history', default: true, selector: { boolean: {} } }]),
