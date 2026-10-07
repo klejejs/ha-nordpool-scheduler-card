@@ -607,7 +607,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               100,
               ((segment.end.getTime() - windowStart) / totalDuration) * 100
             );
-            const cls = segment.state === 'on' ? 'on' : 'off';
+            const cls = isRunning(segment.state) ? 'on' : 'off';
             return html`<div
               class="history-segment ${cls}"
               style="left: ${left}%; width: ${right - left}%"
@@ -746,6 +746,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   static get styles() {
     return sharedStyles;
   }
+}
+
+/** Whether a target state counts as on, by the same rule as the integration's is_running. */
+function isRunning(state: string): boolean {
+  return !['off', 'unavailable', 'unknown'].includes(state);
 }
 
 function errorMessage(err: unknown): string {

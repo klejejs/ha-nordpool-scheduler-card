@@ -28,6 +28,12 @@ export class NordpoolSchedulerCardEditor extends LitElement {
     this._config = config;
   }
 
+  public connectedCallback(): void {
+    super.connectedCallback();
+    // A reattached editor resubscribes without waiting for the next hass update.
+    this.requestUpdate();
+  }
+
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._unsubscribeTarget();
