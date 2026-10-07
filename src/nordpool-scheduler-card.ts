@@ -102,10 +102,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           selector: { entity: { filter: { integration: 'nordpool_scheduler', domain: 'sensor' } } },
         },
         { name: 'name', selector: { text: {} } },
-        { name: 'show_name', selector: { boolean: {} } },
+        { name: 'show_name', default: true, selector: { boolean: {} } },
         { name: 'prices_only', selector: { boolean: {} } },
         { name: 'show_day_tabs', selector: { boolean: {} } },
-        { name: 'show_history', selector: { boolean: {} } },
+        { name: 'show_history', default: true, selector: { boolean: {} } },
         {
           name: 'hide_averages',
           selector: {
