@@ -26,7 +26,7 @@ import {
   nextSlotState,
   priceTier,
 } from './format';
-import './editor';
+import { isPriceSensor } from './editor';
 import { HistoryAccumulator } from './history';
 import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
@@ -83,9 +83,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   private _historyAccumulator = new HistoryAccumulator();
 
   public static getStubConfig(hass: HomeAssistant): NordpoolSchedulerCardConfig {
-    const entity = Object.keys(hass.states).find(
-      (id) => id.startsWith('sensor.') && hass.states[id].attributes.vat_percent !== undefined
-    );
+    const entity = Object.keys(hass.states).find((id) => isPriceSensor(hass, id));
     return { type: 'custom:nordpool-scheduler-card', entity: entity ?? '', show_name: true };
   }
 

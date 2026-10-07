@@ -10,6 +10,13 @@ import type {
   ScheduleSnapshot,
 } from './types';
 
+/** The scheduler's current price sensor carries `vat_percent`; its average price sensors don't. */
+export function isPriceSensor(hass: HomeAssistant, entityId: string): boolean {
+  return (
+    entityId.startsWith('sensor.') && hass.states[entityId].attributes.vat_percent !== undefined
+  );
+}
+
 export class NordpoolSchedulerCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
@@ -82,12 +89,17 @@ export class NordpoolSchedulerCardEditor extends LitElement {
     this._targetEntity = undefined;
   }
 
-  private _schema(): HaFormSchema[] {
+  private _schema(hass: HomeAssistant): HaFormSchema[] {
     return [
       {
         name: 'entity',
         required: true,
-        selector: { entity: { filter: { integration: 'nordpool_scheduler', domain: 'sensor' } } },
+        selector: {
+          entity: {
+            include_entities: Object.keys(hass.states).filter((id) => isPriceSensor(hass, id)),
+            filter: { integration: 'nordpool_scheduler', domain: 'sensor' },
+          },
+        },
       },
       { name: 'name', selector: { text: {} } },
       { name: 'show_name', default: true, selector: { boolean: {} } },
@@ -120,7 +132,7 @@ export class NordpoolSchedulerCardEditor extends LitElement {
     return html`<ha-form
       .hass=${this.hass}
       .data=${this._config}
-      .schema=${this._schema()}
+      .schema=${this._schema(this.hass)}
       .computeLabel=${this._computeLabel}
       @value-changed=${this._valueChanged}
     ></ha-form>`;
