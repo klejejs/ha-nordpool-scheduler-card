@@ -150,6 +150,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     return Boolean(this._config?.show_history) && !this._pricesOnly;
   }
 
+  public connectedCallback(): void {
+    super.connectedCallback();
+    // Views move cards around on first layout; resubscribe without waiting
+    // for the next hass update, which a quiet instance may not send for minutes.
+    this.requestUpdate();
+  }
+
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._unsubscribe?.();
