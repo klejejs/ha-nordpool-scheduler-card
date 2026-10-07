@@ -74,6 +74,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _subscribedEntity?: string;
 
+  private _subscriptionId = 0;
+
   private _unsubscribe?: UnsubscribeFunc;
 
   private _historyEntity?: string;
@@ -162,6 +164,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._unsubscribe?.();
     this._unsubscribe = undefined;
     this._subscribedEntity = undefined;
+    this._subscriptionId++;
     this._teardownHistorySubscription();
   }
 
@@ -185,31 +188,32 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._error = undefined;
     const entityId = this._config!.entity!;
     this._subscribedEntity = entityId;
+    const subscriptionId = ++this._subscriptionId;
     this.hass!.connection.subscribeMessage<ScheduleSnapshot>(
-      (data) => this._onSnapshot(entityId, data),
+      (data) => this._onSnapshot(subscriptionId, data),
       {
         type: 'nordpool_scheduler/subscribe',
         entity_id: entityId,
       }
     )
       .then((unsub) => {
-        if (this._subscribedEntity !== entityId) {
-          // The config changed again before this subscription resolved; it's
-          // already stale, so drop it instead of overwriting the current one.
+        if (this._subscriptionId !== subscriptionId) {
+          // Disconnected or resubscribed before this resolved; it's already
+          // stale, so drop it instead of overwriting the current one.
           unsub();
           return;
         }
         this._unsubscribe = unsub;
       })
       .catch((err: unknown) => {
-        if (this._subscribedEntity === entityId) {
+        if (this._subscriptionId === subscriptionId) {
           this._error = errorMessage(err);
         }
       });
   }
 
-  private _onSnapshot(entityId: string, data: ScheduleSnapshot): void {
-    if (this._subscribedEntity !== entityId) {
+  private _onSnapshot(subscriptionId: number, data: ScheduleSnapshot): void {
+    if (this._subscriptionId !== subscriptionId) {
       return;
     }
     this._error = undefined;
