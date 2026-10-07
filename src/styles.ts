@@ -4,6 +4,8 @@ export const sharedStyles = css`
   :host {
     --np-spacing: 8px;
     --np-radius: 12px;
+    --np-auto-color: var(--primary-color);
+    --np-override-color: var(--accent-color, #ff9800);
   }
 
   ha-card {
@@ -16,6 +18,113 @@ export const sharedStyles = css`
     align-items: center;
     justify-content: space-between;
     margin-bottom: var(--np-spacing);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .auto-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    border: 1px solid var(--divider-color);
+    background: transparent;
+    color: var(--secondary-text-color);
+    font: inherit;
+    font-size: 0.8em;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .auto-chip.enabled {
+    background: var(--np-auto-color);
+    border-color: var(--np-auto-color);
+    color: var(--text-primary-color, #fff);
+  }
+
+  .auto-chip:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  .icon-button {
+    display: inline-flex;
+    padding: 4px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+  }
+
+  .icon-button.active {
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  }
+
+  .chip-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+
+  .button-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--np-spacing);
+    padding: var(--np-spacing);
+    margin-bottom: var(--np-spacing);
+    border-radius: var(--np-radius);
+    background: var(--secondary-background-color);
+  }
+
+  .setting {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .setting-toggle {
+    justify-content: center;
+  }
+
+  .setting-toggle input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--np-auto-color);
+  }
+
+  .setting-label {
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+  }
+
+  .setting input[type='number'] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 6px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font: inherit;
+  }
+
+  .setting-hint {
+    font-size: 0.7em;
+    color: var(--secondary-text-color);
   }
 
   .card-title {
@@ -182,14 +291,69 @@ export const sharedStyles = css`
     color: var(--secondary-text-color);
   }
 
-  .override-dot {
+  .slot-marker {
     position: absolute;
     top: 3px;
+    width: 12px;
+    height: 12px;
+  }
+
+  .auto-marker {
+    left: 3px;
+    fill: var(--np-auto-color);
+  }
+
+  .time-slot.auto-pick.overridden .auto-marker {
+    opacity: 0.35;
+  }
+
+  .override-marker {
     right: 3px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--primary-color);
+    fill: var(--np-override-color);
+  }
+
+  .time-slot.overridden {
+    border-style: dashed;
+  }
+
+  .time-slot.overridden.on {
+    border-color: var(--np-override-color);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: var(--np-spacing);
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .legend-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .legend-icon.auto {
+    fill: var(--np-auto-color);
+  }
+
+  .legend-icon.manual {
+    fill: var(--np-override-color);
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 3px solid var(--primary-color);
+    box-sizing: border-box;
   }
 
   .placeholder-message {

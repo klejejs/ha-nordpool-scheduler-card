@@ -58,23 +58,36 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_history?: boolean;
   show_day_tabs?: boolean;
   history_entity?: string;
-  price_unit?: PriceUnit;
 }
-
-export type PriceUnit = 'cents' | 'currency';
 
 export type SlotOverride = 'on' | 'off' | null;
 export type SlotState = 'on' | 'off';
 export type SetSlotState = 'on' | 'off' | 'default';
 export type ControlMode = 'on_change' | 'enforce';
 
-/** One 15-minute slot, as sent by nordpool_scheduler/subscribe. */
+/** One 15-minute slot, as sent by nordpool_scheduler/subscribe. Prices are in cents/kWh. */
 export interface SlotSnapshot {
   start: string;
   end: string;
   price: number | null;
   override: SlotOverride;
+  /** What auto mode or the default state wants, ignoring the override. */
+  base: SlotState;
+  /** Auto mode's pick, or null when auto mode is off or the day isn't fully priced. */
+  auto: boolean | null;
   effective: SlotState;
+}
+
+/** Auto mode's state and settings, and the entities that hold them. */
+export interface AutoSnapshot {
+  enabled: boolean;
+  switch_entity: string | null;
+  run_hours: number;
+  max_price: number;
+  cheap_price: number;
+  run_hours_entity: string | null;
+  max_price_entity: string | null;
+  cheap_price_entity: string | null;
 }
 
 /** The full snapshot pushed by nordpool_scheduler/subscribe. */
@@ -88,6 +101,7 @@ export interface ScheduleSnapshot {
   vat_percent: number;
   now_slot_start: string;
   target_state: string | null;
+  auto: AutoSnapshot;
   slots: SlotSnapshot[];
 }
 
@@ -98,6 +112,7 @@ export interface RenderSlot {
   price: number | null;
   effective: SlotState;
   isOverridden: boolean;
+  isAutoPick: boolean;
   isCurrent: boolean;
   isPast: boolean;
   isPending: boolean;
