@@ -136,7 +136,8 @@ export const sharedStyles = css`
 
   .info-bar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: var(--np-spacing);
     padding: calc(var(--np-spacing) * 0.75) 0;
     margin-bottom: var(--np-spacing);
@@ -273,6 +274,10 @@ export const sharedStyles = css`
 
   .time-slot.past {
     opacity: 0.45;
+    cursor: default;
+  }
+
+  .time-slot.readonly {
     cursor: default;
   }
 

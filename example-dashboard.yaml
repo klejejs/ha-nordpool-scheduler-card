@@ -16,6 +16,11 @@ views:
         name: Water Heater
         show_day_tabs: true
 
+      # A prices-only entry: shows prices, nothing to click.
+      - type: custom:nordpool-scheduler-card
+        entity: sensor.nordpool_scheduler_prices_lv_electricity_price
+        name: Electricity prices
+
       - type: horizontal-stack
         cards:
           - type: custom:nordpool-scheduler-card

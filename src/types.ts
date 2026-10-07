@@ -58,6 +58,7 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_history?: boolean;
   show_day_tabs?: boolean;
   history_entity?: string;
+  prices_only?: boolean;
 }
 
 export type SlotOverride = 'on' | 'off' | null;
@@ -93,7 +94,7 @@ export interface AutoSnapshot {
 /** The full snapshot pushed by nordpool_scheduler/subscribe. */
 export interface ScheduleSnapshot {
   config_entry_id: string;
-  target_entity: string;
+  target_entity: string | null;
   default_state: SlotState;
   control_mode: ControlMode;
   time_zone: string;

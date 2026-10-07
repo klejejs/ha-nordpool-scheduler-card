@@ -11,7 +11,7 @@ A Lovelace card for the [Nordpool Scheduler](https://github.com/klejejs/ha-nordp
 
 ## Prerequisites
 
-The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry. This card reads and writes through it — it doesn't talk to Nord Pool directly.
+The [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration, set up with a scheduler entry, or a prices-only entry if you only want to see prices. This card reads and writes through it — it doesn't talk to Nord Pool directly.
 
 ## Installation
 
@@ -43,6 +43,7 @@ show_name: true
 show_history: true
 show_day_tabs: false
 history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
+prices_only: false
 ```
 
 | Option | Type | Default | Description |
@@ -53,6 +54,7 @@ history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
 | `show_history` | boolean | `true` | Show a 24h on/off history bar |
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
 | `history_entity` | string | the scheduler's target entity | Entity the history bar tracks |
+| `prices_only` | boolean | `false` | Only show prices: slots can't be clicked, and auto mode, the override count and the history bar are hidden |
 
 ## Usage
 
@@ -73,6 +75,8 @@ The border shows what the slot will actually do: a thick blue border means the e
 Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
 
 The info bar counts the upcoming auto picks and your overrides while auto mode is on, and your overrides alone while it is off.
+
+To show prices on a dashboard without scheduling anything, add a **Prices only** entry in the integration and point the card at its price sensor. That entry controls no entity, so the card shows it as if `prices_only` were set.
 
 Colors are relative to that day's own price range: green is cheap, red is expensive. A day with no published prices yet shows a placeholder instead of an empty grid.
 
