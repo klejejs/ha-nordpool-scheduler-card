@@ -5,7 +5,7 @@
 [![CI](https://github.com/klejejs/ha-nordpool-scheduler-card/actions/workflows/ci.yml/badge.svg)](https://github.com/klejejs/ha-nordpool-scheduler-card/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/klejejs/ha-nordpool-scheduler-card)](LICENSE)
 
-A Lovelace card for the [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration. Shows Nord Pool prices in 15-minute slots and lets you click a slot to turn the scheduled entity on or off for that slot.
+A Lovelace card for the [Nordpool Scheduler](https://github.com/klejejs/ha-nordpool-scheduler-integration) integration. Shows Nord Pool prices in 15-minute slots, shows and controls the scheduler's auto mode, and lets you click a slot to override it.
 
 ![The card showing tomorrow's slots, with cheap slots in green and a run of slots scheduled on](docs/screenshot.png)
 
@@ -43,7 +43,6 @@ show_name: true
 show_history: true
 show_day_tabs: false
 history_entity: binary_sensor.nordpool_scheduler_boiler_scheduled_on # optional
-price_unit: cents # "cents" or "currency"
 prices_only: false
 ```
 
@@ -55,12 +54,27 @@ prices_only: false
 | `show_history` | boolean | `true` | Show a 24h on/off history bar |
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
 | `history_entity` | string | the scheduler's target entity | Entity the history bar tracks |
-| `price_unit` | string | `cents` | Show prices as cents or in the source currency |
-| `prices_only` | boolean | `false` | Only show prices: slots can't be clicked, and the schedule, the Scheduled count and the history bar are hidden |
+| `prices_only` | boolean | `false` | Only show prices: slots can't be clicked, and auto mode, the override count and the history bar are hidden |
 
 ## Usage
 
-Click a slot to schedule the entity on for it; click an on slot to turn it off; click it a third time to remove the override and fall back to the scheduler's default state. A dot marks a slot with an explicit override — the border shows the state (on or off) that will actually apply, whether it comes from an override or the default.
+Prices are shown in cents/kWh, VAT included.
+
+### Auto mode
+
+The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Changes take effect at once.
+
+### Slots
+
+The border shows what the slot will actually do: a thick blue border means the entity runs.
+
+- A robot in the top-left corner marks a slot auto mode picked. It is only shown while auto mode is on.
+- An orange hand in the top-right corner and a dashed border mark your own override. An override that runs the entity has an orange border.
+- A faded robot next to the hand is an auto pick you overrode off.
+
+Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
+
+The info bar counts the upcoming auto picks and your overrides while auto mode is on, and your overrides alone while it is off.
 
 To show prices on a dashboard without scheduling anything, add a **Prices only** entry in the integration and point the card at its price sensor. That entry controls no entity, so the card shows it as if `prices_only` were set.
 

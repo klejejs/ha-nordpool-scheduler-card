@@ -15,7 +15,6 @@ views:
         entity: sensor.nordpool_scheduler_water_heater_electricity_price
         name: Water Heater
         show_day_tabs: true
-        price_unit: currency
 
       # A prices-only entry: shows prices, nothing to click.
       - type: custom:nordpool-scheduler-card

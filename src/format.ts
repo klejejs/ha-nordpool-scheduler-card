@@ -1,4 +1,4 @@
-import type { PriceUnit, RenderSlot, ScheduleSnapshot, SetSlotState, SlotSnapshot } from './types';
+import type { RenderSlot, ScheduleSnapshot, SetSlotState, SlotSnapshot } from './types';
 
 /** Format a slot's start time in the schedule's time zone, not the browser's. */
 export function formatSlotTime(iso: string, timeZone: string, locale: string): string {
@@ -30,22 +30,16 @@ export function formatDayHeading(iso: string, timeZone: string, locale: string):
   }).format(new Date(iso));
 }
 
-export function formatPrice(
-  price: number | null,
-  unit: PriceUnit,
-  currency: string,
-  locale: string
-): string {
+/** Format a price that is already in cents/kWh. */
+export function formatPrice(price: number | null, locale: string): string {
   if (price === null) {
     return '—';
   }
-  const value = unit === 'cents' ? price * 100 : price;
   const formatted = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
-  const suffix = unit === 'cents' ? 'c' : currency;
-  return `${formatted} ${suffix}/kWh`;
+  }).format(price);
+  return `${formatted} c/kWh`;
 }
 
 export interface PriceStats {
@@ -86,19 +80,19 @@ export function priceTier(
 }
 
 /**
- * The state a click on this slot should request next: no override -> "on"
- * override -> "off" override -> no override, regardless of the scheduler's
- * default state (see README's slot-click cycle).
+ * The state a click on this slot should request next: a slot without an
+ * override flips to the opposite of what auto mode or the default wants, and
+ * an overridden slot goes back to following them.
  */
 export function nextSlotState(
   slot: SlotSnapshot,
   pendingState: SetSlotState | undefined
 ): SetSlotState {
   const current = pendingState ?? slot.override ?? 'default';
-  if (current === 'default') {
-    return 'on';
+  if (current !== 'default') {
+    return 'default';
   }
-  return current === 'on' ? 'off' : 'default';
+  return slot.base === 'on' ? 'off' : 'on';
 }
 
 /** Build the slots to render for one local calendar day, applying pending clicks. */
@@ -117,7 +111,7 @@ export function buildRenderSlots(
         pendingState === undefined
           ? slot.effective
           : pendingState === 'default'
-            ? snapshot.default_state
+            ? slot.base
             : pendingState;
       const isOverridden =
         pendingState === undefined ? slot.override !== null : pendingState !== 'default';
@@ -127,6 +121,7 @@ export function buildRenderSlots(
         price: slot.price,
         effective,
         isOverridden,
+        isAutoPick: slot.auto === true,
         isCurrent: slot.start === snapshot.now_slot_start,
         isPast: slot.start < snapshot.now_slot_start,
         isPending: pendingState !== undefined,

@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js';
 import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import type {
+  AutoSnapshot,
   HistorySegment,
   HistoryStreamMessage,
   HomeAssistant,
@@ -24,6 +25,7 @@ import {
   priceTier,
 } from './format';
 import { HistoryAccumulator } from './history';
+import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
 
 declare const __CARD_VERSION__: string;
@@ -35,6 +37,8 @@ console.info(
 );
 
 const HISTORY_HOURS = 24;
+
+type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
 
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -50,6 +54,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @state() private _activeDate?: string;
 
   @state() private _historySegments: HistorySegment[] = [];
+
+  @state() private _showSettings = false;
 
   private _pending = new Map<string, SetSlotState>();
 
@@ -97,18 +103,6 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
             entity: { filter: { integration: 'nordpool_scheduler', domain: 'binary_sensor' } },
           },
         },
-        {
-          name: 'price_unit',
-          selector: {
-            select: {
-              mode: 'dropdown',
-              options: [
-                { value: 'cents', label: 'Cents' },
-                { value: 'currency', label: 'Currency' },
-              ],
-            },
-          },
-        },
       ],
     };
   }
@@ -125,13 +119,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!config?.entity) {
       throw new Error('Entity must be specified');
     }
-    this._config = {
-      show_name: true,
-      show_history: true,
-      price_unit: 'cents',
-      prices_only: false,
-      ...config,
-    };
+    this._config = { show_name: true, show_history: true, prices_only: false, ...config };
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
@@ -321,6 +309,43 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       });
   }
 
+  private _toggleAuto(checkbox?: HTMLInputElement): void {
+    const entity = this._data?.auto.switch_entity;
+    if (!entity || !this.hass) {
+      return;
+    }
+    this.hass.callService('switch', 'toggle', { entity_id: entity }).catch((err: unknown) => {
+      // Lit won't re-set an unchanged .checked, so put the box back by hand.
+      if (checkbox && this._data) {
+        checkbox.checked = this._data.auto.enabled;
+      }
+      this._actionError = `Could not switch auto mode: ${errorMessage(err)}`;
+    });
+  }
+
+  private _setAutoSetting(
+    entity: string | null,
+    setting: AutoSetting,
+    label: string,
+    ev: Event
+  ): void {
+    const input = ev.target as HTMLInputElement;
+    const attempted = input.value;
+    const value = input.valueAsNumber;
+    if (!entity || !this.hass || Number.isNaN(value)) {
+      return;
+    }
+    this.hass
+      .callService('number', 'set_value', { entity_id: entity, value })
+      .catch((err: unknown) => {
+        // Lit won't re-set an unchanged .value; leave a newer edit alone.
+        if (this._data && input.value === attempted) {
+          input.value = String(this._data.auto[setting]);
+        }
+        this._actionError = `Could not set ${label}: ${errorMessage(err)}`;
+      });
+  }
+
   protected render(): TemplateResult {
     if (!this._config || !this.hass) {
       return html``;
@@ -340,9 +365,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const showTabs = this._config.show_day_tabs ?? false;
     const dateKeys = availableDateKeys(this._data);
     const visibleDates = showTabs && this._activeDate ? [this._activeDate] : dateKeys;
-    const scheduledCount = this._data.slots.filter(
+    const manualCount = this._data.slots.filter(
       (s) =>
         (this._pending.get(s.start) ?? (s.override !== null ? s.override : 'default')) !== 'default'
+    ).length;
+    const autoCount = this._data.slots.filter(
+      (s) => s.auto === true && s.start >= this._data!.now_slot_start
     ).length;
     const todaySlots = buildRenderSlots(
       this._data,
@@ -365,58 +393,159 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               >${this._actionError}</ha-alert
             >`
           : nothing}
-        ${this._renderInfoBar(scheduledCount, currentSlot?.price ?? null, todayStats)}
+        ${this._showSettings && !this._pricesOnly ? this._renderSettings(this._data.auto) : nothing}
+        ${this._renderInfoBar(manualCount, autoCount, currentSlot?.price ?? null, todayStats)}
         ${this._showHistory ? this._renderHistoryBar() : nothing}
         ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
         ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
+        ${this._data.auto.enabled && !this._pricesOnly ? this._renderLegend() : nothing}
       </ha-card>
     `;
   }
 
   private _renderHeader(): TemplateResult | typeof nothing {
-    if (!this._config?.show_name) {
+    const showName = this._config?.show_name ?? true;
+    const auto = this._pricesOnly ? undefined : this._data?.auto;
+    if (!showName && !auto) {
       return nothing;
     }
     const name =
-      this._config.name ||
+      this._config?.name ||
       this._data?.target_entity ||
-      this.hass?.states[this._config.entity!]?.attributes.friendly_name ||
+      this.hass?.states[this._config!.entity!]?.attributes.friendly_name ||
       'Nordpool Scheduler';
-    return html`<div class="card-header"><h2 class="card-title">${name}</h2></div>`;
+    return html`<div class="card-header">
+      ${showName ? html`<h2 class="card-title">${name}</h2>` : html`<span></span>`}
+      ${auto ? this._renderAutoControls(auto) : nothing}
+    </div>`;
+  }
+
+  private _renderAutoControls(auto: AutoSnapshot): TemplateResult {
+    const locale = this.hass!.locale.language;
+    const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(
+      auto.run_hours
+    );
+    return html`<div class="header-actions">
+      <button
+        class="auto-chip ${auto.enabled ? 'enabled' : ''}"
+        aria-pressed=${auto.enabled ? 'true' : 'false'}
+        title=${auto.enabled ? 'Auto mode is on. Click to turn it off' : 'Turn auto mode on'}
+        ?disabled=${!auto.switch_entity}
+        @click=${() => this._toggleAuto()}
+      >
+        ${robotIcon('chip-icon')} ${auto.enabled ? `Auto · ${hours} h/day` : 'Auto off'}
+      </button>
+      <button
+        class="icon-button ${this._showSettings ? 'active' : ''}"
+        title="Auto mode settings"
+        aria-expanded=${this._showSettings ? 'true' : 'false'}
+        @click=${() => (this._showSettings = !this._showSettings)}
+      >
+        ${cogIcon('button-icon')}
+      </button>
+    </div>`;
+  }
+
+  private _renderSettings(auto: AutoSnapshot): TemplateResult {
+    return html`<div class="settings">
+      <label class="setting setting-toggle">
+        <span class="setting-label">Auto mode</span>
+        <input
+          type="checkbox"
+          .checked=${auto.enabled}
+          ?disabled=${!auto.switch_entity}
+          @change=${(ev: Event) => this._toggleAuto(ev.target as HTMLInputElement)}
+        />
+      </label>
+      <label class="setting">
+        <span class="setting-label">Hours per day</span>
+        <input
+          type="number"
+          min="0"
+          max="24"
+          step="0.25"
+          .value=${String(auto.run_hours)}
+          ?disabled=${!auto.run_hours_entity}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.run_hours_entity, 'run_hours', 'hours per day', ev)}
+        />
+      </label>
+      <label class="setting">
+        <span class="setting-label">Max price, c/kWh</span>
+        <input
+          type="number"
+          min="0"
+          max="1000"
+          step="0.01"
+          .value=${String(auto.max_price)}
+          ?disabled=${!auto.max_price_entity}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.max_price_entity, 'max_price', 'max price', ev)}
+        />
+        <span class="setting-hint">Skip picks above this. 0 = off</span>
+      </label>
+      <label class="setting">
+        <span class="setting-label">Cheap price, c/kWh</span>
+        <input
+          type="number"
+          min="0"
+          max="1000"
+          step="0.01"
+          .value=${String(auto.cheap_price)}
+          ?disabled=${!auto.cheap_price_entity}
+          @change=${(ev: Event) =>
+            this._setAutoSetting(auto.cheap_price_entity, 'cheap_price', 'cheap price', ev)}
+        />
+        <span class="setting-hint">Always run at or below this. 0 = off</span>
+      </label>
+    </div>`;
+  }
+
+  private _renderLegend(): TemplateResult {
+    return html`<div class="legend">
+      <span class="legend-item">${robotIcon('legend-icon auto')} Auto pick</span>
+      <span class="legend-item">${handIcon('legend-icon manual')} Your override</span>
+      <span class="legend-item"><span class="legend-swatch"></span> Runs</span>
+    </div>`;
   }
 
   private _renderInfoBar(
-    scheduledCount: number,
+    manualCount: number,
+    autoCount: number,
     currentPrice: number | null,
     stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
-    const unit = this._config!.price_unit ?? 'cents';
-    const currency = this._data!.currency;
     const locale = this.hass!.locale.language;
+    const autoOn = this._data!.auto.enabled;
     return html`
       <div class="info-bar">
         <div class="info-item">
           <span class="info-label">Current</span>
-          <span class="info-value">${formatPrice(currentPrice, unit, currency, locale)}</span>
+          <span class="info-value">${formatPrice(currentPrice, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Min</span>
-          <span class="info-value">${formatPrice(stats?.min ?? null, unit, currency, locale)}</span>
+          <span class="info-value">${formatPrice(stats?.min ?? null, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Avg</span>
-          <span class="info-value">${formatPrice(stats?.avg ?? null, unit, currency, locale)}</span>
+          <span class="info-value">${formatPrice(stats?.avg ?? null, locale)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Max</span>
-          <span class="info-value">${formatPrice(stats?.max ?? null, unit, currency, locale)}</span>
+          <span class="info-value">${formatPrice(stats?.max ?? null, locale)}</span>
         </div>
         ${this._pricesOnly
           ? nothing
-          : html`<div class="info-item">
-              <span class="info-label">Scheduled</span>
-              <span class="info-value">${scheduledCount}</span>
-            </div>`}
+          : autoOn
+            ? html`<div class="info-item">
+                <span class="info-label">Auto / Manual</span>
+                <span class="info-value">${autoCount} / ${manualCount}</span>
+              </div>`
+            : html`<div class="info-item">
+                <span class="info-label">Overrides</span>
+                <span class="info-value">${manualCount}</span>
+              </div>`}
       </div>
     `;
   }
@@ -514,8 +643,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
     const tier = priceTier(slot.price, stats);
-    const unit = this._config!.price_unit ?? 'cents';
-    const price = formatPrice(slot.price, unit, this._data!.currency, this.hass!.locale.language);
+    const price = formatPrice(slot.price, this.hass!.locale.language);
     if (this._pricesOnly) {
       const classes = [
         'time-slot',
@@ -537,16 +665,29 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       'time-slot',
       `tier-${tier}`,
       slot.effective === 'on' ? 'on' : '',
+      slot.isAutoPick ? 'auto-pick' : '',
+      slot.isOverridden ? 'overridden' : '',
       slot.isCurrent ? 'current' : '',
       slot.isPast ? 'past' : '',
       slot.isPending ? 'pending' : '',
     ]
       .filter(Boolean)
       .join(' ');
+    const title = [
+      slot.time,
+      price,
+      slot.effective === 'on' ? 'runs' : 'off',
+      slot.isAutoPick ? 'auto pick' : '',
+      slot.isOverridden ? 'your override' : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
     return html`
       <div
         class=${classes}
         role="button"
+        title=${title}
+        aria-label=${title}
         tabindex=${slot.isPast ? -1 : 0}
         @click=${() => this._onSlotClick(slot)}
         @keydown=${(ev: KeyboardEvent) => {
@@ -556,7 +697,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           }
         }}
       >
-        ${slot.isOverridden ? html`<div class="override-dot"></div>` : nothing}
+        ${slot.isAutoPick ? robotIcon('slot-marker auto-marker') : nothing}
+        ${slot.isOverridden ? handIcon('slot-marker override-marker') : nothing}
         <div class="time-label">${slot.time}</div>
         <div class="price-label">${price}</div>
       </div>
