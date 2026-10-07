@@ -255,7 +255,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       clearInterval(this._historyTimer);
       this._historyTimer = undefined;
     }
-    this._historySegments = [];
+    // updated() calls this on every render while history is off, so a fresh
+    // [] each time would schedule another update forever.
+    if (this._historySegments.length > 0) {
+      this._historySegments = [];
+    }
   }
 
   private _onSlotClick(slot: RenderSlot): void {
