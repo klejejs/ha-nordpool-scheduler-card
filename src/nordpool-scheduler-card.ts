@@ -90,12 +90,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const entity = Object.keys(hass.states).find(
       (id) => id.startsWith('sensor.') && hass.states[id].attributes.vat_percent !== undefined
     );
-    return {
-      type: 'custom:nordpool-scheduler-card',
-      entity: entity ?? '',
-      show_name: true,
-      averages: AVERAGE_WINDOWS,
-    };
+    return { type: 'custom:nordpool-scheduler-card', entity: entity ?? '', show_name: true };
   }
 
   public static getConfigForm(): LovelaceConfigForm {
@@ -112,7 +107,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         { name: 'show_day_tabs', selector: { boolean: {} } },
         { name: 'show_history', selector: { boolean: {} } },
         {
-          name: 'averages',
+          name: 'hide_averages',
           selector: {
             select: {
               multiple: true,
@@ -136,7 +131,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public getCardSize(): number {
-    return 6;
+    return this._shownAverages().length > 0 ? 7 : 6;
   }
 
   public setConfig(config: NordpoolSchedulerCardConfig): void {
@@ -574,9 +569,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     `;
   }
 
+  /** The averages the row shows: those the integration sent and the config doesn't hide. */
+  private _shownAverages(): AverageWindow[] {
+    const averages = this._data?.averages;
+    const hidden = this._config?.hide_averages ?? [];
+    return AVERAGE_WINDOWS.filter((key) => averages?.[key] && !hidden.includes(key));
+  }
+
   private _renderAverages(): TemplateResult | typeof nothing {
     const averages = this._data!.averages;
-    const shown = (this._config!.averages ?? AVERAGE_WINDOWS).filter((key) => averages?.[key]);
+    const shown = this._shownAverages();
     if (!averages || shown.length === 0) {
       return nothing;
     }
