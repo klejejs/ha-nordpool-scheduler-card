@@ -297,14 +297,14 @@ export const sharedStyles = css`
     opacity: 0.65;
   }
 
-  .time-label {
-    font-size: 0.75em;
-    font-weight: 500;
+  .price-label {
+    font-size: 0.85em;
+    font-weight: 600;
     color: var(--primary-text-color);
   }
 
-  .price-label {
-    font-size: 0.7em;
+  .time-label {
+    font-size: 0.65em;
     color: var(--secondary-text-color);
   }
 
@@ -477,12 +477,12 @@ export const sharedStyles = css`
     padding: 3px 1px;
   }
 
-  :host([density='super_compact']) .time-label {
-    font-size: 0.65em;
+  :host([density='super_compact']) .price-label {
+    font-size: 0.7em;
   }
 
-  :host([density='super_compact']) .price-label {
-    font-size: 0.6em;
+  :host([density='super_compact']) .time-label {
+    font-size: 0.55em;
   }
 
   :host([density='super_compact']) .slot-marker {

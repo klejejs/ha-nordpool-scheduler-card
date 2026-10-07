@@ -706,8 +706,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         .join(' ');
       return html`
         <div class=${classes}>
-          <div class="time-label">${slot.time}</div>
           <div class="price-label">${priceLabel}</div>
+          <div class="time-label">${slot.time}</div>
         </div>
       `;
     }
@@ -749,8 +749,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       >
         ${slot.isAutoPick ? robotIcon('slot-marker auto-marker') : nothing}
         ${slot.isOverridden ? handIcon('slot-marker override-marker') : nothing}
-        <div class="time-label">${slot.time}</div>
         <div class="price-label">${priceLabel}</div>
+        <div class="time-label">${slot.time}</div>
       </div>
     `;
   }
