@@ -1,4 +1,18 @@
-import type { RenderSlot, ScheduleSnapshot, SetSlotState, SlotSnapshot } from './types';
+import type {
+  AverageWindow,
+  RenderSlot,
+  ScheduleSnapshot,
+  SetSlotState,
+  SlotSnapshot,
+} from './types';
+
+export const AVERAGE_LABELS: Record<AverageWindow, string> = {
+  today: 'Today',
+  week: 'This week',
+  month: 'This month',
+  year: 'This year',
+};
+export const AVERAGE_WINDOWS = Object.keys(AVERAGE_LABELS) as AverageWindow[];
 
 /** Format a slot's start time in the schedule's time zone, not the browser's. */
 export function formatSlotTime(iso: string, timeZone: string, locale: string): string {

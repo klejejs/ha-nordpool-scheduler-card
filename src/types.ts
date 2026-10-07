@@ -9,6 +9,7 @@ export interface HomeAssistant {
   states: Record<string, HassEntity>;
   connection: Connection;
   locale: { language: string };
+  localize(key: string): string;
   callService(
     domain: string,
     service: string,
@@ -45,10 +46,6 @@ export interface HaFormSchema {
   default?: unknown;
 }
 
-export interface LovelaceConfigForm {
-  schema: HaFormSchema[];
-}
-
 /** Card configuration, as stored in the dashboard YAML/storage. */
 export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   type: string;
@@ -57,7 +54,6 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_name?: boolean;
   show_history?: boolean;
   show_day_tabs?: boolean;
-  history_entity?: string;
   prices_only?: boolean;
   /** Average prices to leave out of the row; unset shows them all. */
   hide_averages?: AverageWindow[];
