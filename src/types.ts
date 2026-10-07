@@ -59,6 +59,8 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_day_tabs?: boolean;
   history_entity?: string;
   prices_only?: boolean;
+  /** Average prices to leave out of the row; unset shows them all. */
+  hide_averages?: AverageWindow[];
 }
 
 export type SlotOverride = 'on' | 'off' | null;
@@ -91,6 +93,14 @@ export interface AutoSnapshot {
   cheap_price_entity: string | null;
 }
 
+export type AverageWindow = 'today' | 'week' | 'month' | 'year';
+
+/** The average price while the target ran over one calendar period, in cents/kWh. */
+export interface AverageSnapshot {
+  price: number | null;
+  running_hours: number;
+}
+
 /** The full snapshot pushed by nordpool_scheduler/subscribe. */
 export interface ScheduleSnapshot {
   config_entry_id: string;
@@ -103,6 +113,8 @@ export interface ScheduleSnapshot {
   now_slot_start: string;
   target_state: string | null;
   auto: AutoSnapshot;
+  /** Missing when the integration predates the average price sensors. */
+  averages?: Partial<Record<AverageWindow, AverageSnapshot>>;
   slots: SlotSnapshot[];
 }
 

@@ -4,6 +4,7 @@ import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import type {
   AutoSnapshot,
+  AverageWindow,
   HistorySegment,
   HistoryStreamMessage,
   HomeAssistant,
@@ -37,6 +38,14 @@ console.info(
 );
 
 const HISTORY_HOURS = 24;
+
+const AVERAGE_LABELS: Record<AverageWindow, string> = {
+  today: 'Today',
+  week: 'This week',
+  month: 'This month',
+  year: 'This year',
+};
+const AVERAGE_WINDOWS = Object.keys(AVERAGE_LABELS) as AverageWindow[];
 
 type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
 
@@ -98,6 +107,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         { name: 'show_day_tabs', selector: { boolean: {} } },
         { name: 'show_history', selector: { boolean: {} } },
         {
+          name: 'hide_averages',
+          selector: {
+            select: {
+              multiple: true,
+              mode: 'list',
+              options: AVERAGE_WINDOWS.map((value) => ({ value, label: AVERAGE_LABELS[value] })),
+            },
+          },
+        },
+        {
           name: 'history_entity',
           selector: {
             entity: { filter: { integration: 'nordpool_scheduler', domain: 'binary_sensor' } },
@@ -112,7 +131,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public getCardSize(): number {
-    return 6;
+    return this._shownAverages().length > 0 ? 7 : 6;
   }
 
   public setConfig(config: NordpoolSchedulerCardConfig): void {
@@ -395,7 +414,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           : nothing}
         ${this._showSettings && !this._pricesOnly ? this._renderSettings(this._data.auto) : nothing}
         ${this._renderInfoBar(manualCount, autoCount, currentSlot?.price ?? null, todayStats)}
-        ${this._showHistory ? this._renderHistoryBar() : nothing}
+        ${this._renderAverages()} ${this._showHistory ? this._renderHistoryBar() : nothing}
         ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
         ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
         ${this._data.auto.enabled && !this._pricesOnly ? this._renderLegend() : nothing}
@@ -546,6 +565,42 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
                 <span class="info-label">Overrides</span>
                 <span class="info-value">${manualCount}</span>
               </div>`}
+      </div>
+    `;
+  }
+
+  /** The averages the row shows: those the integration sent and the config doesn't hide. */
+  private _shownAverages(): AverageWindow[] {
+    const averages = this._data?.averages;
+    const hidden = this._config?.hide_averages ?? [];
+    return AVERAGE_WINDOWS.filter((key) => averages?.[key] && !hidden.includes(key));
+  }
+
+  private _renderAverages(): TemplateResult | typeof nothing {
+    const averages = this._data!.averages;
+    const shown = this._shownAverages();
+    if (!averages || shown.length === 0) {
+      return nothing;
+    }
+    const locale = this.hass!.locale.language;
+    const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+    return html`
+      <div class="averages">
+        <span class="averages-title"
+          >${this._pricesOnly ? 'Average price' : 'Average price while on'}</span
+        >
+        <div class="info-bar">
+          ${shown.map((key) => {
+            const average = averages[key]!;
+            return html`<div class="info-item">
+              <span class="info-label">${AVERAGE_LABELS[key]}</span>
+              <span class="info-value">${formatPrice(average.price, locale)}</span>
+              ${this._pricesOnly
+                ? nothing
+                : html`<span class="info-hint">${hours.format(average.running_hours)} h on</span>`}
+            </div>`;
+          })}
+        </div>
       </div>
     `;
   }
