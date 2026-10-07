@@ -59,6 +59,7 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_day_tabs?: boolean;
   history_entity?: string;
   price_unit?: PriceUnit;
+  prices_only?: boolean;
 }
 
 export type PriceUnit = 'cents' | 'currency';
@@ -80,7 +81,7 @@ export interface SlotSnapshot {
 /** The full snapshot pushed by nordpool_scheduler/subscribe. */
 export interface ScheduleSnapshot {
   config_entry_id: string;
-  target_entity: string;
+  target_entity: string | null;
   default_state: SlotState;
   control_mode: ControlMode;
   time_zone: string;

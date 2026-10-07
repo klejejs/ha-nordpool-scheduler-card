@@ -65,6 +65,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _unsubscribeHistory?: UnsubscribeFunc;
 
+  private _historyRequestId = 0;
+
   private _historyTimer?: ReturnType<typeof setInterval>;
 
   private _historyAccumulator = new HistoryAccumulator();
@@ -86,6 +88,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         },
         { name: 'name', selector: { text: {} } },
         { name: 'show_name', selector: { boolean: {} } },
+        { name: 'prices_only', selector: { boolean: {} } },
         { name: 'show_day_tabs', selector: { boolean: {} } },
         { name: 'show_history', selector: { boolean: {} } },
         {
@@ -122,7 +125,22 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!config?.entity) {
       throw new Error('Entity must be specified');
     }
-    this._config = { show_name: true, show_history: true, price_unit: 'cents', ...config };
+    this._config = {
+      show_name: true,
+      show_history: true,
+      price_unit: 'cents',
+      prices_only: false,
+      ...config,
+    };
+  }
+
+  /** A prices entry has no target, so there is no schedule to show or change. */
+  private get _pricesOnly(): boolean {
+    return Boolean(this._config?.prices_only) || this._data?.target_entity === null;
+  }
+
+  private get _showHistory(): boolean {
+    return Boolean(this._config?.show_history) && !this._pricesOnly;
   }
 
   public disconnectedCallback(): void {
@@ -203,15 +221,15 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _ensureHistorySubscription(): void {
-    if (!this._config?.show_history) {
+    if (!this._showHistory) {
       this._teardownHistorySubscription();
       return;
     }
     if (!this._data || !this.hass) {
       return;
     }
-    const entityId = this._config.history_entity || this._data.target_entity;
-    if (this._historyEntity === entityId) {
+    const entityId = this._config!.history_entity || this._data.target_entity;
+    if (!entityId || this._historyEntity === entityId) {
       return;
     }
     this._teardownHistorySubscription();
@@ -219,9 +237,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._historyAccumulator = new HistoryAccumulator();
     this._historySegments = [];
     const startTime = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000);
+    const requestId = ++this._historyRequestId;
     this.hass.connection
       .subscribeMessage<HistoryStreamMessage>(
         (msg) => {
+          if (requestId !== this._historyRequestId) {
+            return;
+          }
           this._historyAccumulator.addMessage(msg, entityId, HISTORY_HOURS);
           this._historySegments = this._historyAccumulator.segments();
         },
@@ -235,6 +257,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         }
       )
       .then((unsub) => {
+        if (requestId !== this._historyRequestId) {
+          // Torn down before the subscription resolved; don't leave it open.
+          unsub();
+          return;
+        }
         this._unsubscribeHistory = unsub;
       })
       .catch(() => {
@@ -248,6 +275,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _teardownHistorySubscription(): void {
+    this._historyRequestId++;
     this._unsubscribeHistory?.();
     this._unsubscribeHistory = undefined;
     this._historyEntity = undefined;
@@ -255,11 +283,15 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       clearInterval(this._historyTimer);
       this._historyTimer = undefined;
     }
-    this._historySegments = [];
+    // This runs from updated() on every render while history is off, so
+    // assigning a fresh [] each time would schedule renders forever.
+    if (this._historySegments.length > 0) {
+      this._historySegments = [];
+    }
   }
 
   private _onSlotClick(slot: RenderSlot): void {
-    if (slot.isPast || !this._data || !this.hass) {
+    if (slot.isPast || this._pricesOnly || !this._data || !this.hass) {
       return;
     }
     const raw = this._data.slots.find((s) => s.start === slot.start);
@@ -334,7 +366,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
             >`
           : nothing}
         ${this._renderInfoBar(scheduledCount, currentSlot?.price ?? null, todayStats)}
-        ${this._config.show_history ? this._renderHistoryBar() : nothing}
+        ${this._showHistory ? this._renderHistoryBar() : nothing}
         ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
         ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
       </ha-card>
@@ -345,7 +377,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!this._config?.show_name) {
       return nothing;
     }
-    const name = this._config.name || this._data?.target_entity || 'Nordpool Scheduler';
+    const name =
+      this._config.name ||
+      this._data?.target_entity ||
+      this.hass?.states[this._config.entity!]?.attributes.friendly_name ||
+      'Nordpool Scheduler';
     return html`<div class="card-header"><h2 class="card-title">${name}</h2></div>`;
   }
 
@@ -375,10 +411,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           <span class="info-label">Max</span>
           <span class="info-value">${formatPrice(stats?.max ?? null, unit, currency, locale)}</span>
         </div>
-        <div class="info-item">
-          <span class="info-label">Scheduled</span>
-          <span class="info-value">${scheduledCount}</span>
-        </div>
+        ${this._pricesOnly
+          ? nothing
+          : html`<div class="info-item">
+              <span class="info-label">Scheduled</span>
+              <span class="info-value">${scheduledCount}</span>
+            </div>`}
       </div>
     `;
   }
@@ -476,6 +514,25 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     stats: ReturnType<typeof calculatePriceStats>
   ): TemplateResult {
     const tier = priceTier(slot.price, stats);
+    const unit = this._config!.price_unit ?? 'cents';
+    const price = formatPrice(slot.price, unit, this._data!.currency, this.hass!.locale.language);
+    if (this._pricesOnly) {
+      const classes = [
+        'time-slot',
+        'readonly',
+        `tier-${tier}`,
+        slot.isCurrent ? 'current' : '',
+        slot.isPast ? 'past' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return html`
+        <div class=${classes}>
+          <div class="time-label">${slot.time}</div>
+          <div class="price-label">${price}</div>
+        </div>
+      `;
+    }
     const classes = [
       'time-slot',
       `tier-${tier}`,
@@ -486,7 +543,6 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     ]
       .filter(Boolean)
       .join(' ');
-    const unit = this._config!.price_unit ?? 'cents';
     return html`
       <div
         class=${classes}
@@ -502,9 +558,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       >
         ${slot.isOverridden ? html`<div class="override-dot"></div>` : nothing}
         <div class="time-label">${slot.time}</div>
-        <div class="price-label">
-          ${formatPrice(slot.price, unit, this._data!.currency, this.hass!.locale.language)}
-        </div>
+        <div class="price-label">${price}</div>
       </div>
     `;
   }
