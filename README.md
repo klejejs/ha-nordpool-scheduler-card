@@ -42,6 +42,7 @@ name: Boiler # optional, defaults to the entity's name
 show_name: true
 show_history: true
 show_day_tabs: false
+hide_past_slots: false
 density: normal # normal, compact or super_compact
 hide_averages: [] # e.g. [week, year]
 ```
@@ -53,6 +54,7 @@ hide_averages: [] # e.g. [week, year]
 | `show_name` | boolean | `true` | Show the card title |
 | `show_history` | boolean | `true` | Show a 24h on/off history bar of the scheduler's target entity |
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
+| `hide_past_slots` | boolean | `false` | Leave out today's rows that have fully passed. The row with the current slot stays, so each row still starts on the hour |
 | `density` | string | `normal` | How tightly the card is laid out. `compact` keeps four slots per row, one row per hour, but makes the slots short and the rest of the card smaller. `super_compact` goes further to fit a phone screen: eight slots per row, smaller text, and slot prices without the unit |
 | `hide_averages` | list | none | Average prices to leave out of the row: `today`, `week`, `month`, `year`. Listing all four hides the row |
 | `set_slots_service` | string | see below | For a mirrored scheduler only: the Remote Home-Assistant proxy service that sets slots |

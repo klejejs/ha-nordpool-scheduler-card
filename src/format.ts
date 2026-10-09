@@ -142,3 +142,9 @@ export function buildRenderSlots(
       };
     });
 }
+
+/** Drop the grid rows before the one holding the current slot; a day without one is kept whole. */
+export function dropPastRows(slots: RenderSlot[], rowSize: number): RenderSlot[] {
+  const current = slots.findIndex((s) => s.isCurrent);
+  return current < 0 ? slots : slots.slice(current - (current % rowSize));
+}
