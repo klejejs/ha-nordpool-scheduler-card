@@ -413,7 +413,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   ): void {
     const input = ev.target as HTMLInputElement;
     const attempted = input.value;
-    if (!entity || !this.hass || !attempted) {
+    if (!attempted) {
+      // A cleared input sends nothing, so show the saved time again.
+      input.value = this._data?.auto[setting] ?? '';
+      return;
+    }
+    if (!entity || !this.hass) {
       return;
     }
     const time = attempted.length === 5 ? `${attempted}:00` : attempted;
