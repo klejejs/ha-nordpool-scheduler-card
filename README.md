@@ -48,13 +48,30 @@ hide_averages: [] # e.g. [week, year]
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `entity` | string | required | The scheduler's electricity price sensor |
+| `entity` | string | required | The scheduler's electricity price sensor, or its mirrored Schedule sensor on [another instance](#on-another-instance) |
 | `name` | string | entity name | Card title |
 | `show_name` | boolean | `true` | Show the card title |
 | `show_history` | boolean | `true` | Show a 24h on/off history bar of the scheduler's target entity |
 | `show_day_tabs` | boolean | `false` | Today/Tomorrow tabs instead of stacked sections |
 | `density` | string | `normal` | How tightly the card is laid out. `compact` keeps four slots per row, one row per hour, but makes the slots short and the rest of the card smaller. `super_compact` goes further to fit a phone screen: eight slots per row, smaller text, and slot prices without the unit |
 | `hide_averages` | list | none | Average prices to leave out of the row: `today`, `week`, `month`, `year`. Listing all four hides the row |
+| `set_slots_service` | string | see below | For a mirrored scheduler only: the Remote Home-Assistant proxy service that sets slots |
+
+### On another instance
+
+The card can show a scheduler that runs on another Home Assistant instance and is mirrored into this one with [Remote Home-Assistant](https://github.com/custom-components/remote_homeassistant). Set up the other instance as the [integration's README](https://github.com/klejejs/ha-nordpool-scheduler-integration#another-home-assistant-instance) describes, then point the card at the mirrored Schedule sensor:
+
+```yaml
+type: custom:nordpool-scheduler-card
+entity: sensor.darzs_nordpool_scheduler_boiler_schedule
+name: Boiler
+```
+
+The card reads the schedule from that sensor's attribute, so it updates whenever Remote Home-Assistant mirrors a change. It works out the entity prefix (`darzs_` here) by comparing the sensor's ID with the one it has on the other instance, and uses it to find the mirrored auto mode switch and numbers and the target entity's history.
+
+Clicking a slot calls `nordpool_scheduler.<prefix>set_slots`, e.g. `nordpool_scheduler.darzs_set_slots`. That is Remote Home-Assistant's proxy for `nordpool_scheduler.set_slots` when its service prefix matches the entity prefix. If you gave it a different service prefix, set `set_slots_service` to the proxy's full name.
+
+The auto mode controls need the switch and numbers mirrored too, and the history bar needs the target entity mirrored and recorded on this instance. While the other instance is unreachable, Remote Home-Assistant removes its entities, and the card says so until they come back.
 
 ## Usage
 

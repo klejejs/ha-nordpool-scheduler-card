@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js';
 import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import { AVERAGE_LABELS, AVERAGE_WINDOWS } from './format';
+import { isMirrored, publishedSnapshot, setSlotsService } from './published';
 import type {
   Density,
   HaFormSchema,
@@ -55,8 +56,19 @@ export class NordpoolSchedulerCardEditor extends LitElement {
 
   protected updated(changed: PropertyValues): void {
     super.updated(changed);
+    if (!this.hass) {
+      return;
+    }
     const entityId = this._config?.entity;
-    if (this.hass && entityId !== this._subscribedEntity) {
+    const published = entityId ? publishedSnapshot(this.hass, entityId) : undefined;
+    if (published) {
+      if (this._subscribedEntity !== undefined) {
+        this._unsubscribeTarget();
+      }
+      this._targetEntity = published.target_entity;
+      return;
+    }
+    if (entityId !== this._subscribedEntity) {
       this._subscribeTarget(entityId);
     }
   }
@@ -97,17 +109,28 @@ export class NordpoolSchedulerCardEditor extends LitElement {
   }
 
   private _schema(hass: HomeAssistant): HaFormSchema[] {
+    const entityId = this._config?.entity;
     return [
       {
         name: 'entity',
         required: true,
         selector: {
           entity: {
-            include_entities: Object.keys(hass.states).filter((id) => isPriceSensor(hass, id)),
-            filter: { integration: 'nordpool_scheduler', domain: 'sensor' },
+            include_entities: Object.keys(hass.states).filter(
+              (id) =>
+                publishedSnapshot(hass, id) !== undefined ||
+                (isPriceSensor(hass, id) && !isMirrored(hass, id))
+            ),
+            filter: [
+              { integration: 'nordpool_scheduler', domain: 'sensor' },
+              { integration: 'remote_homeassistant', domain: 'sensor' },
+            ],
           },
         },
       },
+      ...(entityId && isMirrored(hass, entityId)
+        ? [{ name: 'set_slots_service', selector: { text: {} } }]
+        : []),
       { name: 'name', selector: { text: {} } },
       { name: 'show_name', default: true, selector: { boolean: {} } },
       { name: 'show_day_tabs', selector: { boolean: {} } },
@@ -137,6 +160,16 @@ export class NordpoolSchedulerCardEditor extends LitElement {
     this.hass?.localize(`ui.panel.lovelace.editor.card.generic.${schema.name}`) ||
     schema.name.charAt(0).toUpperCase() + schema.name.slice(1).split('_').join(' ');
 
+  private _computeHelper = (schema: HaFormSchema): string | undefined => {
+    const entityId = this._config?.entity;
+    if (schema.name !== 'set_slots_service' || !this.hass || !entityId) {
+      return undefined;
+    }
+    const published = publishedSnapshot(this.hass, entityId);
+    const hint = "Remote Home-Assistant's proxy for nordpool_scheduler.set_slots";
+    return published ? `${hint}. Defaults to ${setSlotsService(entityId, published)}` : hint;
+  };
+
   protected render(): TemplateResult | typeof nothing {
     if (!this.hass || !this._config) {
       return nothing;
@@ -146,6 +179,7 @@ export class NordpoolSchedulerCardEditor extends LitElement {
       .data=${this._config}
       .schema=${this._schema(this.hass)}
       .computeLabel=${this._computeLabel}
+      .computeHelper=${this._computeHelper}
       @value-changed=${this._valueChanged}
     ></ha-form>`;
   }

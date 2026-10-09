@@ -7,6 +7,8 @@ import type { Connection, HassEntity } from 'home-assistant-js-websocket';
  */
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
+  /** The entity registry, as far as the frontend gets it. */
+  entities?: Record<string, { platform?: string }>;
   connection: Connection;
   locale: { language: string };
   localize(key: string): string;
@@ -57,6 +59,8 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   density?: Density;
   /** Average prices to leave out of the row; unset shows them all. */
   hide_averages?: AverageWindow[];
+  /** The proxy for nordpool_scheduler.set_slots, for a scheduler mirrored from another instance. */
+  set_slots_service?: string;
 }
 
 export type Density = 'normal' | 'compact' | 'super_compact';
@@ -114,6 +118,21 @@ export interface ScheduleSnapshot {
   /** Missing when the integration predates the average price sensors. */
   averages?: Partial<Record<AverageWindow, AverageSnapshot>>;
   slots: SlotSnapshot[];
+}
+
+/**
+ * The snapshot a scheduler's Schedule sensor publishes as its `schedule`
+ * attribute. Slots are consecutive, so each slot field is one list or string
+ * indexed by slot, with "1" for on, "0" for off and "-" for none.
+ */
+export interface PublishedSnapshot extends Omit<ScheduleSnapshot, 'slots'> {
+  /** The Schedule sensor's entity ID on the instance that publishes it. */
+  entity_id: string;
+  slots_start: string;
+  slot_prices: (number | null)[];
+  slot_overrides: string;
+  slot_base: string;
+  slot_auto: string;
 }
 
 /** One rendered time slot, with everything the template needs. */
