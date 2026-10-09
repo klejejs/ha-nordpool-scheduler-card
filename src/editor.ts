@@ -134,6 +134,7 @@ export class NordpoolSchedulerCardEditor extends LitElement {
       { name: 'name', selector: { text: {} } },
       { name: 'show_name', default: true, selector: { boolean: {} } },
       { name: 'show_day_tabs', selector: { boolean: {} } },
+      { name: 'hide_past_slots', selector: { boolean: {} } },
       {
         name: 'density',
         default: 'normal',

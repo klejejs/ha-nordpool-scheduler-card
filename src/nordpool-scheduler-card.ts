@@ -22,6 +22,7 @@ import {
   AVERAGE_WINDOWS,
   buildRenderSlots,
   calculatePriceStats,
+  dropPastRows,
   formatDayHeading,
   formatPrice,
   localDateKey,
@@ -836,12 +837,15 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     );
     const hasPrices = slots.some((s) => s.price !== null);
     const stats = calculatePriceStats(slots);
+    const shown = this._config!.hide_past_slots
+      ? dropPastRows(slots, this._density === 'super_compact' ? 8 : 4)
+      : slots;
 
     return html`
       ${showTabs ? nothing : html`<div class="day-heading">${this._dayLabel(dateKey)}</div>`}
       ${hasPrices
         ? html`<div class="schedule-grid">
-            ${slots.map((slot) => this._renderSlot(slot, stats))}
+            ${shown.map((slot) => this._renderSlot(slot, stats))}
           </div>`
         : html`<div class="placeholder-message">Prices published ~14:00 CET</div>`}
     `;
