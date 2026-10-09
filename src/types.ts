@@ -56,6 +56,8 @@ export interface NordpoolSchedulerCardConfig extends LovelaceCardConfig {
   show_name?: boolean;
   show_history?: boolean;
   show_day_tabs?: boolean;
+  /** Leave out today's rows that have fully passed. */
+  hide_past_slots?: boolean;
   density?: Density;
   /** Average prices to leave out of the row; unset shows them all. */
   hide_averages?: AverageWindow[];
