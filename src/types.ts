@@ -95,6 +95,16 @@ export interface AutoSnapshot {
   run_hours_entity: string | null;
   max_price_entity: string | null;
   cheap_price_entity: string | null;
+  /** The hour range fields are missing when the integration predates them. */
+  window_enabled?: boolean;
+  /** "HH:MM" in the scheduler's time zone. */
+  window_start?: string;
+  window_end?: string;
+  cheap_all_day?: boolean;
+  window_enabled_entity?: string | null;
+  window_start_entity?: string | null;
+  window_end_entity?: string | null;
+  cheap_all_day_entity?: string | null;
 }
 
 export type AverageWindow = 'today' | 'week' | 'month' | 'year';

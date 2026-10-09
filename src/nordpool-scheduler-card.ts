@@ -52,6 +52,8 @@ console.info(
 const HISTORY_HOURS = 24;
 
 type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
+type AutoSwitch = 'enabled' | 'window_enabled' | 'cheap_all_day';
+type AutoTime = 'window_start' | 'window_end';
 
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -385,18 +387,50 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       });
   }
 
-  private _toggleAuto(checkbox?: HTMLInputElement): void {
-    const entity = this._data?.auto.switch_entity;
+  private _toggleSwitch(
+    entity: string | null | undefined,
+    setting: AutoSwitch,
+    label: string,
+    checkbox?: HTMLInputElement
+  ): void {
     if (!entity || !this.hass) {
       return;
     }
     this.hass.callService('switch', 'toggle', { entity_id: entity }).catch((err: unknown) => {
       // Lit won't re-set an unchanged .checked, so put the box back by hand.
       if (checkbox && this._data) {
-        checkbox.checked = this._data.auto.enabled;
+        checkbox.checked = this._data.auto[setting] ?? false;
       }
-      this._actionError = `Could not switch auto mode: ${errorMessage(err)}`;
+      this._actionError = `Could not switch ${label}: ${errorMessage(err)}`;
     });
+  }
+
+  private _setAutoTime(
+    entity: string | null | undefined,
+    setting: AutoTime,
+    label: string,
+    ev: Event
+  ): void {
+    const input = ev.target as HTMLInputElement;
+    const attempted = input.value;
+    if (!attempted) {
+      // A cleared input sends nothing, so show the saved time again.
+      input.value = this._data?.auto[setting] ?? '';
+      return;
+    }
+    if (!entity || !this.hass) {
+      return;
+    }
+    const time = attempted.length === 5 ? `${attempted}:00` : attempted;
+    this.hass
+      .callService('time', 'set_value', { entity_id: entity, time })
+      .catch((err: unknown) => {
+        // Lit won't re-set an unchanged .value; leave a newer edit alone.
+        if (this._data && input.value === attempted) {
+          input.value = this._data.auto[setting] ?? '';
+        }
+        this._actionError = `Could not set ${label}: ${errorMessage(err)}`;
+      });
   }
 
   private _setAutoSetting(
@@ -501,15 +535,19 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(
       auto.run_hours
     );
+    const range =
+      auto.window_enabled && auto.window_start !== auto.window_end
+        ? ` · ${auto.window_start}–${auto.window_end}`
+        : '';
     return html`<div class="header-actions">
       <button
         class="auto-chip ${auto.enabled ? 'enabled' : ''}"
         aria-pressed=${auto.enabled ? 'true' : 'false'}
         title=${auto.enabled ? 'Auto mode is on. Click to turn it off' : 'Turn auto mode on'}
         ?disabled=${!auto.switch_entity}
-        @click=${() => this._toggleAuto()}
+        @click=${() => this._toggleSwitch(auto.switch_entity, 'enabled', 'auto mode')}
       >
-        ${robotIcon('chip-icon')} ${auto.enabled ? `Auto · ${hours} h/day` : 'Auto off'}
+        ${robotIcon('chip-icon')} ${auto.enabled ? `Auto · ${hours} h/day${range}` : 'Auto off'}
       </button>
       <button
         class="icon-button ${this._showSettings ? 'active' : ''}"
@@ -530,7 +568,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           type="checkbox"
           .checked=${auto.enabled}
           ?disabled=${!auto.switch_entity}
-          @change=${(ev: Event) => this._toggleAuto(ev.target as HTMLInputElement)}
+          @change=${(ev: Event) =>
+            this._toggleSwitch(
+              auto.switch_entity,
+              'enabled',
+              'auto mode',
+              ev.target as HTMLInputElement
+            )}
         />
       </label>
       <label class="setting">
@@ -574,7 +618,66 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         />
         <span class="setting-hint">Always run at or below this. 0 = off</span>
       </label>
+      ${auto.window_enabled_entity === undefined ? nothing : this._renderHourRange(auto)}
     </div>`;
+  }
+
+  private _renderHourRange(auto: AutoSnapshot): TemplateResult {
+    return html`<label class="setting setting-toggle">
+        <span class="setting-label">Hour range</span>
+        <input
+          type="checkbox"
+          .checked=${auto.window_enabled ?? false}
+          ?disabled=${!auto.window_enabled_entity}
+          @change=${(ev: Event) =>
+            this._toggleSwitch(
+              auto.window_enabled_entity,
+              'window_enabled',
+              'hour range',
+              ev.target as HTMLInputElement
+            )}
+        />
+      </label>
+      ${auto.window_enabled
+        ? html`<label class="setting">
+              <span class="setting-label">From</span>
+              <input
+                type="time"
+                step="900"
+                .value=${auto.window_start ?? ''}
+                ?disabled=${!auto.window_start_entity}
+                @change=${(ev: Event) =>
+                  this._setAutoTime(auto.window_start_entity, 'window_start', 'start time', ev)}
+              />
+            </label>
+            <label class="setting">
+              <span class="setting-label">To</span>
+              <input
+                type="time"
+                step="900"
+                .value=${auto.window_end ?? ''}
+                ?disabled=${!auto.window_end_entity}
+                @change=${(ev: Event) =>
+                  this._setAutoTime(auto.window_end_entity, 'window_end', 'end time', ev)}
+              />
+              <span class="setting-hint">Hours are only picked in between</span>
+            </label>
+            <label class="setting setting-toggle">
+              <span class="setting-label">Cheap price all day</span>
+              <input
+                type="checkbox"
+                .checked=${auto.cheap_all_day ?? false}
+                ?disabled=${!auto.cheap_all_day_entity}
+                @change=${(ev: Event) =>
+                  this._toggleSwitch(
+                    auto.cheap_all_day_entity,
+                    'cheap_all_day',
+                    'cheap price all day',
+                    ev.target as HTMLInputElement
+                  )}
+              />
+            </label>`
+        : nothing}`;
   }
 
   private _renderLegend(): TemplateResult {

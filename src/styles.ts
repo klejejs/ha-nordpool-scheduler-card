@@ -111,7 +111,8 @@ export const sharedStyles = css`
     color: var(--secondary-text-color);
   }
 
-  .setting input[type='number'] {
+  .setting input[type='number'],
+  .setting input[type='time'] {
     width: 100%;
     box-sizing: border-box;
     padding: 6px 8px;

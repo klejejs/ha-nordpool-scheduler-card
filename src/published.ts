@@ -52,7 +52,16 @@ export function mirroredEntities(
 ): string {
   const prefix = mirrorPrefix(entityId, published.entity_id);
   const { auto } = published;
-  return [auto.switch_entity, auto.run_hours_entity, auto.max_price_entity, auto.cheap_price_entity]
+  return [
+    auto.switch_entity,
+    auto.run_hours_entity,
+    auto.max_price_entity,
+    auto.cheap_price_entity,
+    auto.window_enabled_entity,
+    auto.window_start_entity,
+    auto.window_end_entity,
+    auto.cheap_all_day_entity,
+  ]
     .map((id) => (id && hass.states[mirroredId(id, prefix)] ? '1' : '0'))
     .join('');
 }
@@ -115,6 +124,14 @@ export function unpackSnapshot(
       run_hours_entity: local(auto.run_hours_entity),
       max_price_entity: local(auto.max_price_entity),
       cheap_price_entity: local(auto.cheap_price_entity),
+      ...(auto.window_enabled_entity === undefined
+        ? {}
+        : {
+            window_enabled_entity: local(auto.window_enabled_entity),
+            window_start_entity: local(auto.window_start_entity ?? null),
+            window_end_entity: local(auto.window_end_entity ?? null),
+            cheap_all_day_entity: local(auto.cheap_all_day_entity ?? null),
+          }),
     },
     averages: published.averages,
     slots,
