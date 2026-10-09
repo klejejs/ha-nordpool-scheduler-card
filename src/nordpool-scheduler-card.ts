@@ -12,6 +12,7 @@ import type {
   LovelaceCard,
   LovelaceGridOptions,
   NordpoolSchedulerCardConfig,
+  PublishedSnapshot,
   RenderSlot,
   ScheduleSnapshot,
   SetSlotState,
@@ -29,6 +30,7 @@ import {
 } from './format';
 import { isPriceSensor } from './editor';
 import { HistoryAccumulator } from './history';
+import { isMirrored, publishedSnapshot, setSlotsService, unpackSnapshot } from './published';
 import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
 
@@ -72,6 +74,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   private _subscriptionId = 0;
 
   private _unsubscribe?: UnsubscribeFunc;
+
+  /** The Schedule sensor attribute the current data came from, when it didn't come from the websocket. */
+  private _published?: PublishedSnapshot;
 
   private _historyEntity?: string;
 
@@ -143,10 +148,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._unsubscribe?.();
-    this._unsubscribe = undefined;
-    this._subscribedEntity = undefined;
-    this._subscriptionId++;
+    this._stopSubscription();
     this._teardownHistorySubscription();
   }
 
@@ -155,17 +157,57 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!this.hass || !this._config?.entity) {
       return;
     }
-    if (this._subscribedEntity !== this._config.entity) {
-      this._subscribe();
-    }
+    this._syncSnapshot(this._config.entity);
     if (this._data) {
       this._ensureHistorySubscription();
     }
   }
 
-  private _subscribe(): void {
+  /**
+   * Read the snapshot from the entity's `schedule` attribute when it has one,
+   * which is how a scheduler mirrored from another instance arrives, and
+   * subscribe to it over the websocket otherwise.
+   */
+  private _syncSnapshot(entityId: string): void {
+    const published = publishedSnapshot(this.hass!, entityId);
+    if (published) {
+      this._stopSubscription();
+      if (published !== this._published) {
+        this._published = published;
+        this._error = undefined;
+        this._applySnapshot(unpackSnapshot(this.hass!, entityId, published));
+      }
+      return;
+    }
+    if (this._published) {
+      this._published = undefined;
+      this._data = undefined;
+    }
+    if (isMirrored(this.hass!, entityId)) {
+      // Remote Home-Assistant removes its entities while the other instance is unreachable.
+      this._stopSubscription();
+      this._error = this.hass!.states[entityId]
+        ? "it has no schedule. Point the card at the scheduler's Schedule sensor"
+        : 'it is not mirrored right now. Is the other instance reachable?';
+      return;
+    }
+    if (this._subscribedEntity !== entityId) {
+      this._subscribe();
+    }
+  }
+
+  private _stopSubscription(): void {
+    if (this._subscribedEntity === undefined) {
+      return;
+    }
     this._unsubscribe?.();
     this._unsubscribe = undefined;
+    this._subscribedEntity = undefined;
+    this._subscriptionId++;
+  }
+
+  private _subscribe(): void {
+    this._stopSubscription();
     this._data = undefined;
     this._error = undefined;
     const entityId = this._config!.entity!;
@@ -199,6 +241,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       return;
     }
     this._error = undefined;
+    this._applySnapshot(data);
+  }
+
+  private _applySnapshot(data: ScheduleSnapshot): void {
     this._data = data;
     for (const [start, requested] of this._pending) {
       const slot = data.slots.find((s) => s.start === start);
@@ -304,8 +350,14 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._pendingRequestId.set(slot.start, requestId);
     this.requestUpdate();
 
+    const [domain, service] = (
+      this._config?.set_slots_service ??
+      (this._published
+        ? setSlotsService(this._config!.entity!, this._published)
+        : 'nordpool_scheduler.set_slots')
+    ).split('.', 2);
     this.hass
-      .callService('nordpool_scheduler', 'set_slots', {
+      .callService(domain, service, {
         config_entry: this._data.config_entry_id,
         slots: [{ start: slot.start, state: requested }],
       })
