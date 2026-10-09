@@ -30,7 +30,13 @@ import {
 } from './format';
 import { isPriceSensor } from './editor';
 import { HistoryAccumulator } from './history';
-import { isMirrored, publishedSnapshot, setSlotsService, unpackSnapshot } from './published';
+import {
+  isMirrored,
+  mirroredEntities,
+  publishedSnapshot,
+  setSlotsService,
+  unpackSnapshot,
+} from './published';
 import { cogIcon, handIcon, robotIcon } from './icons';
 import { sharedStyles } from './styles';
 
@@ -77,6 +83,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   /** The Schedule sensor attribute the current data came from, when it didn't come from the websocket. */
   private _published?: PublishedSnapshot;
+
+  /** Which of the published snapshot's entities were mirrored here when it was unpacked. */
+  private _publishedMirrors?: string;
 
   private _historyEntity?: string;
 
@@ -172,8 +181,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const published = publishedSnapshot(this.hass!, entityId);
     if (published) {
       this._stopSubscription();
-      if (published !== this._published) {
+      const mirrors = mirroredEntities(this.hass!, entityId, published);
+      if (published !== this._published || mirrors !== this._publishedMirrors) {
         this._published = published;
+        this._publishedMirrors = mirrors;
         this._error = undefined;
         this._applySnapshot(unpackSnapshot(this.hass!, entityId, published));
       }
@@ -181,6 +192,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     }
     if (this._published) {
       this._published = undefined;
+      this._publishedMirrors = undefined;
       this._data = undefined;
     }
     if (isMirrored(this.hass!, entityId)) {
@@ -351,10 +363,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this.requestUpdate();
 
     const [domain, service] = (
-      this._config?.set_slots_service ??
-      (this._published
-        ? setSlotsService(this._config!.entity!, this._published)
-        : 'nordpool_scheduler.set_slots')
+      this._published
+        ? this._config?.set_slots_service || setSlotsService(this._config!.entity!, this._published)
+        : 'nordpool_scheduler.set_slots'
     ).split('.', 2);
     this.hass
       .callService(domain, service, {

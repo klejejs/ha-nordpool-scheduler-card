@@ -44,6 +44,19 @@ export function setSlotsService(entityId: string, published: PublishedSnapshot):
   return `nordpool_scheduler.${mirrorPrefix(entityId, published.entity_id)}set_slots`;
 }
 
+/** Which of the snapshot's auto mode entities are mirrored here, as a string that changes when they do. */
+export function mirroredEntities(
+  hass: HomeAssistant,
+  entityId: string,
+  published: PublishedSnapshot
+): string {
+  const prefix = mirrorPrefix(entityId, published.entity_id);
+  const { auto } = published;
+  return [auto.switch_entity, auto.run_hours_entity, auto.max_price_entity, auto.cheap_price_entity]
+    .map((id) => (id && hass.states[mirroredId(id, prefix)] ? '1' : '0'))
+    .join('');
+}
+
 /** Python's isoformat() for a UTC instant, which is how the integration writes slot starts. */
 function utcIsoformat(ms: number): string {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, '+00:00');

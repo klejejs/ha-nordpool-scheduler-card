@@ -117,7 +117,9 @@ export class NordpoolSchedulerCardEditor extends LitElement {
         selector: {
           entity: {
             include_entities: Object.keys(hass.states).filter(
-              (id) => isPriceSensor(hass, id) || publishedSnapshot(hass, id) !== undefined
+              (id) =>
+                publishedSnapshot(hass, id) !== undefined ||
+                (isPriceSensor(hass, id) && !isMirrored(hass, id))
             ),
             filter: [
               { integration: 'nordpool_scheduler', domain: 'sensor' },
