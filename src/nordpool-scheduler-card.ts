@@ -623,7 +623,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _renderHourRange(auto: AutoSnapshot): TemplateResult {
-    return html`<label class="setting setting-toggle">
+    return html`<div class="settings-range">
+      <label class="setting setting-toggle">
         <span class="setting-label">Hour range</span>
         <input
           type="checkbox"
@@ -637,6 +638,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               ev.target as HTMLInputElement
             )}
         />
+        <span class="setting-hint">Only pick hours between From and To</span>
       </label>
       ${auto.window_enabled
         ? html`<label class="setting">
@@ -660,7 +662,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
                 @change=${(ev: Event) =>
                   this._setAutoTime(auto.window_end_entity, 'window_end', 'end time', ev)}
               />
-              <span class="setting-hint">Hours are only picked in between</span>
+              <span class="setting-hint">Same as From = whole day</span>
             </label>
             <label class="setting setting-toggle">
               <span class="setting-label">Cheap price all day</span>
@@ -676,8 +678,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
                     ev.target as HTMLInputElement
                   )}
               />
+              <span class="setting-hint">Also run cheap slots outside the range</span>
             </label>`
-        : nothing}`;
+        : nothing}
+    </div>`;
   }
 
   private _renderLegend(): TemplateResult {

@@ -11,6 +11,7 @@ export const sharedStyles = css`
   ha-card {
     padding: calc(var(--np-spacing) * 1.5);
     box-sizing: border-box;
+    container-type: inline-size;
   }
 
   .card-header {
@@ -81,12 +82,29 @@ export const sharedStyles = css`
 
   .settings {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--np-spacing);
     padding: var(--np-spacing);
     margin-bottom: var(--np-spacing);
     border-radius: var(--np-radius);
     background: var(--secondary-background-color);
+  }
+
+  @container (min-width: 520px) {
+    .settings {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .settings-range {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: inherit;
+    gap: inherit;
+  }
+
+  .settings-range .setting-toggle {
+    justify-content: flex-start;
   }
 
   .setting {
@@ -113,6 +131,8 @@ export const sharedStyles = css`
 
   .setting input[type='number'],
   .setting input[type='time'] {
+    display: block;
+    min-width: 0;
     width: 100%;
     box-sizing: border-box;
     padding: 6px 8px;
@@ -121,6 +141,18 @@ export const sharedStyles = css`
     background: var(--card-background-color);
     color: var(--primary-text-color);
     font: inherit;
+  }
+
+  /* Safari keeps a native time input at its intrinsic width, centred, unless its appearance is reset. */
+  .setting input[type='time'] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: calc(1.15em + 14px);
+    text-align: left;
+  }
+
+  .setting input[type='time']::-webkit-date-and-time-value {
+    text-align: left;
   }
 
   .setting-hint {
@@ -401,10 +433,6 @@ export const sharedStyles = css`
 
   :host([density]) .icon-button {
     padding: 2px;
-  }
-
-  :host([density]) .settings {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   }
 
   :host([density]) .info-bar {
