@@ -105,6 +105,11 @@ export interface AutoSnapshot {
   window_start_entity?: string | null;
   window_end_entity?: string | null;
   cheap_all_day_entity?: string | null;
+  /** The run limit fields are missing when the integration predates them. */
+  runs_limited?: boolean;
+  max_runs?: number;
+  runs_limited_entity?: string | null;
+  max_runs_entity?: string | null;
 }
 
 export type AverageWindow = 'today' | 'week' | 'month' | 'year';

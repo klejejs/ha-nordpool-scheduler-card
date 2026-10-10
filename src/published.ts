@@ -61,6 +61,8 @@ export function mirroredEntities(
     auto.window_start_entity,
     auto.window_end_entity,
     auto.cheap_all_day_entity,
+    auto.runs_limited_entity,
+    auto.max_runs_entity,
   ]
     .map((id) => (id && hass.states[mirroredId(id, prefix)] ? '1' : '0'))
     .join('');
@@ -131,6 +133,12 @@ export function unpackSnapshot(
             window_start_entity: local(auto.window_start_entity ?? null),
             window_end_entity: local(auto.window_end_entity ?? null),
             cheap_all_day_entity: local(auto.cheap_all_day_entity ?? null),
+          }),
+      ...(auto.runs_limited_entity === undefined
+        ? {}
+        : {
+            runs_limited_entity: local(auto.runs_limited_entity),
+            max_runs_entity: local(auto.max_runs_entity ?? null),
           }),
     },
     averages: published.averages,

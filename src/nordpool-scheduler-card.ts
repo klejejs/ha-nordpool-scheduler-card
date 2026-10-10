@@ -51,8 +51,8 @@ console.info(
 
 const HISTORY_HOURS = 24;
 
-type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price';
-type AutoSwitch = 'enabled' | 'window_enabled' | 'cheap_all_day';
+type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price' | 'max_runs';
+type AutoSwitch = 'enabled' | 'window_enabled' | 'cheap_all_day' | 'runs_limited';
 type AutoTime = 'window_start' | 'window_end';
 
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
@@ -450,7 +450,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       .catch((err: unknown) => {
         // Lit won't re-set an unchanged .value; leave a newer edit alone.
         if (this._data && input.value === attempted) {
-          input.value = String(this._data.auto[setting]);
+          input.value = String(this._data.auto[setting] ?? '');
         }
         this._actionError = `Could not set ${label}: ${errorMessage(err)}`;
       });
@@ -539,6 +539,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       auto.window_enabled && auto.window_start !== auto.window_end
         ? ` · ${auto.window_start}–${auto.window_end}`
         : '';
+    const runs = auto.runs_limited
+      ? ` · ${auto.max_runs} ${auto.max_runs === 1 ? 'run' : 'runs'}`
+      : '';
     return html`<div class="header-actions">
       <button
         class="auto-chip ${auto.enabled ? 'enabled' : ''}"
@@ -547,7 +550,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ?disabled=${!auto.switch_entity}
         @click=${() => this._toggleSwitch(auto.switch_entity, 'enabled', 'auto mode')}
       >
-        ${robotIcon('chip-icon')} ${auto.enabled ? `Auto · ${hours} h/day${range}` : 'Auto off'}
+        ${robotIcon('chip-icon')}
+        ${auto.enabled ? `Auto · ${hours} h/day${range}${runs}` : 'Auto off'}
       </button>
       <button
         class="icon-button ${this._showSettings ? 'active' : ''}"
@@ -619,6 +623,44 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         <span class="setting-hint">Always run at or below this. 0 = off</span>
       </label>
       ${auto.window_enabled_entity === undefined ? nothing : this._renderHourRange(auto)}
+      ${auto.runs_limited_entity === undefined ? nothing : this._renderRunLimit(auto)}
+    </div>`;
+  }
+
+  private _renderRunLimit(auto: AutoSnapshot): TemplateResult {
+    return html`<div class="settings-range">
+      <label class="setting setting-toggle">
+        <span class="setting-label">Limit runs</span>
+        <input
+          type="checkbox"
+          .checked=${auto.runs_limited ?? false}
+          ?disabled=${!auto.runs_limited_entity}
+          @change=${(ev: Event) =>
+            this._toggleSwitch(
+              auto.runs_limited_entity,
+              'runs_limited',
+              'run limit',
+              ev.target as HTMLInputElement
+            )}
+        />
+        <span class="setting-hint">Fewer on/off cycles, e.g. for a boiler</span>
+      </label>
+      ${auto.runs_limited
+        ? html`<label class="setting">
+            <span class="setting-label">Runs per day</span>
+            <input
+              type="number"
+              min="1"
+              max="24"
+              step="1"
+              .value=${String(auto.max_runs ?? 1)}
+              ?disabled=${!auto.max_runs_entity}
+              @change=${(ev: Event) =>
+                this._setAutoSetting(auto.max_runs_entity ?? null, 'max_runs', 'runs per day', ev)}
+            />
+            <span class="setting-hint">1 = the hours run in one go</span>
+          </label>`
+        : nothing}
     </div>`;
   }
 
