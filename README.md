@@ -81,7 +81,7 @@ Prices are shown in cents/kWh, VAT included.
 
 ### Auto mode
 
-The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Check **Hour range** to only pick hours between a start and an end time, for example 17:00 to 23:00; the chip then shows the range too. With the range on, **Cheap price all day** lets slots at or below the cheap price run outside it as well. Changes take effect at once. The hour range needs a version of the integration that has it.
+The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Check **Hour range** to only pick hours between a start and an end time, for example 17:00 to 23:00; the chip then shows the range too. With the range on, **Cheap price all day** lets slots at or below the cheap price run outside it as well. Changes take effect at once. Check **Limit runs** to cap how many separate runs auto mode makes a day, for a target like a boiler that shouldn't start often; **Runs per day** at 1 runs the hours in one go, and the chip shows the limit. The hour range and the run limit each need a version of the integration that has them.
 
 ### Slots
 
