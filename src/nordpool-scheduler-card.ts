@@ -1,5 +1,5 @@
 import { LitElement, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
-import { property, state } from 'lit/decorators.js';
+import { property, query, state } from 'lit/decorators.js';
 import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import type {
@@ -38,7 +38,8 @@ import {
   setSlotsService,
   unpackSnapshot,
 } from './published';
-import { cogIcon, handIcon, robotIcon } from './icons';
+import { closeIcon, cogIcon, handIcon, infoIcon, robotIcon } from './icons';
+import { renderInfo } from './info';
 import { sharedStyles } from './styles';
 
 declare const __CARD_VERSION__: string;
@@ -71,6 +72,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @state() private _historySegments: HistorySegment[] = [];
 
   @state() private _showSettings = false;
+
+  @query('.info-dialog') private _infoDialog?: HTMLDialogElement;
 
   private _pending = new Map<string, SetSlotState>();
 
@@ -466,10 +469,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         <ha-alert alert-type="error"
           >Could not load "${this._config.entity}": ${this._error}</ha-alert
         >
+        ${this._renderInfoDialog()}
       </ha-card>`;
     }
     if (!this._data) {
-      return html`<ha-card>${this._renderHeader()}</ha-card>`;
+      return html`<ha-card>${this._renderHeader()} ${this._renderInfoDialog()}</ha-card>`;
     }
 
     const showTabs = this._config.show_day_tabs ?? false;
@@ -509,16 +513,14 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
         ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
         ${this._data.auto.enabled && !this._pricesOnly ? this._renderLegend() : nothing}
+        ${this._renderInfoDialog()}
       </ha-card>
     `;
   }
 
-  private _renderHeader(): TemplateResult | typeof nothing {
+  private _renderHeader(): TemplateResult {
     const showName = this._config?.show_name ?? true;
     const auto = this._pricesOnly ? undefined : this._data?.auto;
-    if (!showName && !auto) {
-      return nothing;
-    }
     const name =
       this._config?.name ||
       this._data?.target_entity ||
@@ -526,8 +528,46 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       'Nordpool Scheduler';
     return html`<div class="card-header">
       ${showName ? html`<h2 class="card-title">${name}</h2>` : html`<span></span>`}
-      ${auto ? this._renderAutoControls(auto) : nothing}
+      <div class="header-actions">
+        ${auto ? this._renderAutoControls(auto) : nothing}
+        <button
+          class="icon-button"
+          title="How this card works"
+          aria-haspopup="dialog"
+          @click=${() => this._infoDialog?.showModal()}
+        >
+          ${infoIcon('button-icon')}
+        </button>
+      </div>
     </div>`;
+  }
+
+  private _renderInfoDialog(): TemplateResult {
+    return html`<dialog
+      class="info-dialog"
+      aria-labelledby="info-title"
+      @click=${(ev: Event) => {
+        // A click on the backdrop lands on the dialog itself, not its content.
+        if (ev.target === ev.currentTarget) {
+          this._infoDialog?.close();
+        }
+      }}
+    >
+      <div class="info-dialog-header">
+        <h2 id="info-title">How this card works</h2>
+        <button class="icon-button" title="Close" @click=${() => this._infoDialog?.close()}>
+          ${closeIcon('button-icon')}
+        </button>
+      </div>
+      <div class="info-dialog-body">
+        ${renderInfo({
+          data: this._data,
+          config: this._config!,
+          locale: this.hass!.locale.language,
+          mirrored: isMirrored(this.hass!, this._config!.entity!),
+        })}
+      </div>
+    </dialog>`;
   }
 
   private _renderAutoControls(auto: AutoSnapshot): TemplateResult {
@@ -542,8 +582,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const runs = auto.runs_limited
       ? ` · ${auto.max_runs} ${auto.max_runs === 1 ? 'run' : 'runs'}`
       : '';
-    return html`<div class="header-actions">
-      <button
+    return html`<button
         class="auto-chip ${auto.enabled ? 'enabled' : ''}"
         aria-pressed=${auto.enabled ? 'true' : 'false'}
         title=${auto.enabled ? 'Auto mode is on. Click to turn it off' : 'Turn auto mode on'}
@@ -560,8 +599,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         @click=${() => (this._showSettings = !this._showSettings)}
       >
         ${cogIcon('button-icon')}
-      </button>
-    </div>`;
+      </button>`;
   }
 
   private _renderSettings(auto: AutoSnapshot): TemplateResult {

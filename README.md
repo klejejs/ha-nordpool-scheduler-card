@@ -79,6 +79,8 @@ The auto mode controls need the switch and numbers mirrored too, and the history
 
 Prices are shown in cents/kWh, VAT included.
 
+The ⓘ button in the header opens **How this card works**: this scheduler's current settings, and an explanation of every feature and how they combine.
+
 ### Auto mode
 
 The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Check **Hour range** to only pick hours between a start and an end time, for example 17:00 to 23:00; the chip then shows the range too. With the range on, **Cheap price all day** lets slots at or below the cheap price run outside it as well. Changes take effect at once. Check **Limit runs** to cap how many separate runs auto mode makes a day, for a target like a boiler that shouldn't start often; **Runs per day** at 1 runs the hours in one go, and the chip shows the limit. The hour range and the run limit each need a version of the integration that has them.
@@ -112,6 +114,8 @@ yarn start       # rollup --watch, served on :5005
 yarn lint        # eslint + tsc --noEmit
 yarn format
 ```
+
+Every user-facing feature, option or behaviour, whether it comes from the card or the integration, is explained in the info dialog in [`src/info.ts`](src/info.ts). A change that adds or alters one updates that file and this README in the same pull request.
 
 Point a dashboard's Lovelace resource at `http://<dev-machine>:5005/nordpool-scheduler-card.js` while `yarn start` is running to iterate against a real Home Assistant instance.
 
