@@ -413,6 +413,133 @@ export const sharedStyles = css`
     padding: calc(var(--np-spacing) * 2) 0;
   }
 
+  .info-dialog {
+    width: min(560px, calc(100vw - 32px));
+    max-width: none;
+    max-height: 85vh;
+    padding: 0;
+    border: none;
+    border-radius: var(--ha-dialog-border-radius, 24px);
+    background: var(--ha-dialog-surface-background, var(--card-background-color, #fff));
+    color: var(--primary-text-color);
+    font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, inherit));
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .info-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .info-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .info-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 16px 16px 12px 24px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+
+  .info-dialog-header h2 {
+    margin: 0;
+    font-size: 1.4em;
+    font-weight: 400;
+  }
+
+  .info-dialog .icon-button {
+    padding: 8px;
+  }
+
+  .info-dialog .button-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .info-dialog-body {
+    overflow-y: auto;
+    padding: 0 24px 24px;
+  }
+
+  .info-dialog-body h3 {
+    margin: 20px 0 6px;
+    font-size: 1.05em;
+    font-weight: 500;
+  }
+
+  .info-dialog-body p,
+  .info-dialog-body ul,
+  .info-dialog-body ol {
+    margin: 0 0 8px;
+  }
+
+  .info-dialog-body ul,
+  .info-dialog-body ol {
+    padding-left: 20px;
+  }
+
+  .info-dialog-body li {
+    margin-bottom: 4px;
+  }
+
+  .info-dialog-body code {
+    font-size: 0.9em;
+  }
+
+  .info-dialog-body .legend-swatch {
+    display: inline-block;
+    vertical-align: -1px;
+  }
+
+  .info-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+  }
+
+  .info-icon.auto {
+    fill: var(--np-auto-color);
+  }
+
+  .info-icon.manual {
+    fill: var(--np-override-color);
+  }
+
+  .info-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 16px;
+    margin: 0 0 8px;
+    padding: 12px 16px;
+    border-radius: var(--np-radius);
+    background: var(--secondary-background-color);
+  }
+
+  .info-facts dt {
+    color: var(--secondary-text-color);
+  }
+
+  .info-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Home Assistant's own dialogs fill the screen on a phone. */
+  @media (max-width: 600px) {
+    .info-dialog {
+      width: 100vw;
+      height: 100dvh;
+      max-height: none;
+      border-radius: 0;
+    }
+  }
+
   :host([density]) {
     --np-spacing: 4px;
     --np-radius: 6px;
