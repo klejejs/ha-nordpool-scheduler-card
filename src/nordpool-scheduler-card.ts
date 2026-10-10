@@ -658,7 +658,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               @change=${(ev: Event) =>
                 this._setAutoSetting(auto.max_runs_entity ?? null, 'max_runs', 'runs per day', ev)}
             />
-            <span class="setting-hint">1 = the hours run in one go</span>
+            <span class="setting-hint">How many times a day it may switch on</span>
           </label>`
         : nothing}
     </div>`;
