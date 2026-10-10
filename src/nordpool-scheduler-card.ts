@@ -564,7 +564,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           data: this._data,
           config: this._config!,
           locale: this.hass!.locale.language,
-          mirrored: this._published !== undefined,
+          mirrored: isMirrored(this.hass!, this._config!.entity!),
         })}
       </div>
     </dialog>`;

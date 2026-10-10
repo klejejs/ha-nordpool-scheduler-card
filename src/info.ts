@@ -20,7 +20,7 @@ export function renderInfo(ctx: InfoContext): TemplateResult {
   return html`
     ${ctx.data ? renderThisScheduler(ctx.data, ctx.locale, ctx.mirrored) : nothing}
     ${pricesOnly ? renderPricesOnly() : renderScheduling()} ${renderNumbers(pricesOnly)}
-    ${renderCardOptions(ctx.config)} ${renderOtherInstance()}
+    ${renderCardOptions(ctx.config, pricesOnly)} ${renderOtherInstance(pricesOnly)}
   `;
 }
 
@@ -70,8 +70,13 @@ function renderThisScheduler(
       ${fact('Max price', limit(auto.max_price, locale))}
       ${fact('Cheap price', limit(auto.cheap_price, locale))}
       ${hasRange ? fact('Hour range', auto.window_enabled ? range : 'Off') : nothing}
-      ${hasRange && auto.window_enabled
-        ? fact('Cheap price all day', auto.cheap_all_day ? 'On' : 'Off')
+      ${hasRange
+        ? fact(
+            'Cheap price all day',
+            auto.window_enabled
+              ? onOff(auto.cheap_all_day)
+              : `${onOff(auto.cheap_all_day)}, applies once the hour range is on`
+          )
         : nothing}
       ${hasRunLimit
         ? fact('Run limit', auto.runs_limited ? `On, ${auto.max_runs ?? 1} per day` : 'Off')
@@ -317,7 +322,10 @@ function onOff(value: boolean | undefined): string {
   return value ? 'On' : 'Off';
 }
 
-function renderCardOptions(config: NordpoolSchedulerCardConfig): TemplateResult {
+function renderCardOptions(
+  config: NordpoolSchedulerCardConfig,
+  pricesOnly: boolean
+): TemplateResult {
   const density = { normal: 'Normal', compact: 'Compact', super_compact: 'Super compact' }[
     config.density ?? 'normal'
   ];
@@ -336,7 +344,7 @@ function renderCardOptions(config: NordpoolSchedulerCardConfig): TemplateResult 
         row still starts on the hour.
       </li>
       <li><strong>Hide averages</strong>: leaves some of the average prices out.</li>
-      <li><strong>Show history</strong>: the Last 24h bar.</li>
+      ${pricesOnly ? nothing : html`<li><strong>Show history</strong>: the Last 24h bar.</li>`}
     </ul>
     <dl class="info-facts">
       ${fact('Density', density ?? 'Normal')} ${fact('Day tabs', onOff(config.show_day_tabs))}
@@ -345,20 +353,23 @@ function renderCardOptions(config: NordpoolSchedulerCardConfig): TemplateResult 
         'Hidden averages',
         hidden.length ? hidden.map((w) => AVERAGE_LABELS[w] ?? w).join(', ') : 'None'
       )}
-      ${fact('Show history', onOff(config.show_history))}
+      ${pricesOnly ? nothing : fact('Show history', onOff(config.show_history))}
     </dl>
   </section>`;
 }
 
-function renderOtherInstance(): TemplateResult {
+function renderOtherInstance(pricesOnly: boolean): TemplateResult {
   return html`<section>
-    <h3>A scheduler on another instance</h3>
+    <h3>${pricesOnly ? 'Prices from another instance' : 'A scheduler on another instance'}</h3>
     <p>
-      The card can show a scheduler that runs on another Home Assistant instance, mirrored here with
+      The card can show an entry that runs on another Home Assistant instance, mirrored here with
       Remote Home-Assistant. Point the card at the mirrored <strong>Schedule</strong> sensor.
-      Clicking a slot goes through Remote Home-Assistant's proxy for
-      <code>nordpool_scheduler.set_slots</code>. The auto mode controls need its switches, numbers
-      and times mirrored too, and the history bar needs the target mirrored and recorded here.
+      ${pricesOnly
+        ? nothing
+        : html`Clicking a slot goes through Remote Home-Assistant's proxy for
+            <code>nordpool_scheduler.set_slots</code>. The auto mode controls need its switches,
+            numbers and times mirrored too, and the history bar needs the target mirrored and
+            recorded here.`}
     </p>
   </section>`;
 }
