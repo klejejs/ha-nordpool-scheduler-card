@@ -530,6 +530,20 @@ export const sharedStyles = css`
     overflow-wrap: anywhere;
   }
 
+  .info-dialog-close {
+    display: block;
+    width: 100%;
+    margin-top: 24px;
+    padding: 12px;
+    border: none;
+    border-radius: 24px;
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
   /* Home Assistant's own dialogs fill the screen on a phone. */
   @media (max-width: 600px) {
     .info-dialog {
@@ -537,6 +551,19 @@ export const sharedStyles = css`
       height: 100dvh;
       max-height: none;
       border-radius: 0;
+    }
+
+    /* The Home Assistant app draws the page under the status bar and the home indicator. */
+    .info-dialog-header {
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      padding-left: calc(24px + env(safe-area-inset-left, 0px));
+      padding-right: calc(16px + env(safe-area-inset-right, 0px));
+    }
+
+    .info-dialog-body {
+      padding-left: calc(24px + env(safe-area-inset-left, 0px));
+      padding-right: calc(24px + env(safe-area-inset-right, 0px));
+      padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     }
   }
 
