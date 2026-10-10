@@ -655,8 +655,15 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               step="1"
               .value=${String(auto.max_runs ?? 1)}
               ?disabled=${!auto.max_runs_entity}
-              @change=${(ev: Event) =>
-                this._setAutoSetting(auto.max_runs_entity ?? null, 'max_runs', 'runs per day', ev)}
+              @change=${(ev: Event) => {
+                const input = ev.target as HTMLInputElement;
+                // step="1" doesn't stop a typed 1.5, which the integration would round down.
+                if (!Number.isInteger(input.valueAsNumber)) {
+                  input.value = String(auto.max_runs ?? 1);
+                  return;
+                }
+                this._setAutoSetting(auto.max_runs_entity ?? null, 'max_runs', 'runs per day', ev);
+              }}
             />
             <span class="setting-hint">How many times a day it may switch on</span>
           </label>`
