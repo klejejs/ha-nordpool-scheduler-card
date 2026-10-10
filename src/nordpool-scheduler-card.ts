@@ -566,6 +566,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           locale: this.hass!.locale.language,
           mirrored: isMirrored(this.hass!, this._config!.entity!),
         })}
+        <button class="info-dialog-close" @click=${() => this._infoDialog?.close()}>Close</button>
       </div>
     </dialog>`;
   }
