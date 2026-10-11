@@ -6,7 +6,7 @@
   "scripts": {
     "start": "rollup -c --watch",
     "build": "rollup -c",
-    "lint": "eslint src --ext .ts && tsc --noEmit",
+    "lint": "eslint src && tsc --noEmit",
     "format": "prettier --write src/**/*.ts"
   },
   "packageManager": "yarn@1.22.22",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@babel/core": "8.0.7",
     "@babel/preset-env": "8.0.7",
+    "@eslint/js": "10.0.1",
     "@rollup/plugin-babel": "7.1.0",
     "@rollup/plugin-commonjs": "29.0.3",
     "@rollup/plugin-json": "6.1.0",
