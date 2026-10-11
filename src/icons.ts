@@ -13,6 +13,9 @@ const STOP =
   'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4M9,9V15H15V9';
 const CLOSE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
+const DELETE =
+  'M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z';
+const PLUS = 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z';
 
 function icon(path: string, cls: string): SVGTemplateResult {
   return svg`<svg class=${cls} viewBox="0 0 24 24" aria-hidden="true"><path d=${path}></path></svg>`;
@@ -24,3 +27,5 @@ export const cogIcon = (cls = 'icon'): SVGTemplateResult => icon(COG, cls);
 export const infoIcon = (cls = 'icon'): SVGTemplateResult => icon(INFO, cls);
 export const stopIcon = (cls = 'icon'): SVGTemplateResult => icon(STOP, cls);
 export const closeIcon = (cls = 'icon'): SVGTemplateResult => icon(CLOSE, cls);
+export const deleteIcon = (cls = 'icon'): SVGTemplateResult => icon(DELETE, cls);
+export const plusIcon = (cls = 'icon'): SVGTemplateResult => icon(PLUS, cls);

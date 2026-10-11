@@ -4,6 +4,7 @@ import type { UnsubscribeFunc } from 'home-assistant-js-websocket';
 
 import type {
   AutoSnapshot,
+  AutoWindow,
   AverageWindow,
   Density,
   HistorySegment,
@@ -28,17 +29,29 @@ import {
   localDateKey,
   nextSlotState,
   priceTier,
+  windowsSummary,
 } from './format';
 import { isPriceSensor } from './editor';
 import { HistoryAccumulator } from './history';
 import {
+  hasService,
   isMirrored,
   mirroredEntities,
   publishedSnapshot,
+  setAutoWindowsService,
   setSlotsService,
   unpackSnapshot,
 } from './published';
-import { closeIcon, cogIcon, handIcon, infoIcon, robotIcon, stopIcon } from './icons';
+import {
+  closeIcon,
+  cogIcon,
+  deleteIcon,
+  handIcon,
+  infoIcon,
+  plusIcon,
+  robotIcon,
+  stopIcon,
+} from './icons';
 import { renderInfo } from './info';
 import { sharedStyles } from './styles';
 
@@ -55,6 +68,15 @@ const HISTORY_HOURS = 24;
 type AutoSetting = 'run_hours' | 'max_price' | 'cheap_price' | 'max_runs';
 type AutoSwitch = 'enabled' | 'window_enabled' | 'cheap_all_day' | 'runs_limited';
 type AutoTime = 'window_start' | 'window_end';
+type WindowField = keyof AutoWindow;
+
+const NEW_WINDOW: AutoWindow = {
+  start: '00:00',
+  end: '23:59',
+  hours: 1,
+  max_price: 0,
+  cheap_price: 0,
+};
 
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -436,8 +458,62 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       });
   }
 
+  /** The action that replaces auto mode's time windows, here or through a mirror's proxy. */
+  private get _setWindowsService(): string {
+    return this._published
+      ? setAutoWindowsService(
+          this._config!.entity!,
+          this._published,
+          this._config?.set_slots_service
+        )
+      : 'nordpool_scheduler.set_auto_windows';
+  }
+
+  private _setWindows(windows: AutoWindow[], failed: string, revert?: () => void): void {
+    if (!this.hass || !this._data) {
+      return;
+    }
+    const [domain, service] = this._setWindowsService.split('.', 2);
+    this.hass
+      .callService(domain, service, { config_entry: this._data.config_entry_id, windows })
+      .catch((err: unknown) => {
+        revert?.();
+        this._actionError = `Could not ${failed}: ${errorMessage(err)}`;
+      });
+  }
+
+  private _editWindow(index: number, field: WindowField, ev: Event): void {
+    const windows = this._data?.auto.windows;
+    if (!windows) {
+      return;
+    }
+    const input = ev.target as HTMLInputElement;
+    const saved = windows[index][field];
+    let value: string | number;
+    if (field === 'start' || field === 'end') {
+      value = input.value.slice(0, 5);
+    } else {
+      // A cleared price means no limit; cleared hours stay as they were.
+      value = input.value === '' && field !== 'hours' ? 0 : input.valueAsNumber;
+    }
+    if (value === '' || (typeof value === 'number' && (Number.isNaN(value) || value < 0))) {
+      input.value = String(saved);
+      return;
+    }
+    const attempted = input.value;
+    const edited = windows.map((window, i) =>
+      i === index ? { ...window, [field]: value } : window
+    );
+    this._setWindows(edited, 'change the time window', () => {
+      // Lit won't re-set an unchanged .value; leave a newer edit alone.
+      if (input.value === attempted) {
+        input.value = String(saved);
+      }
+    });
+  }
+
   private _setAutoSetting(
-    entity: string | null,
+    entity: string | null | undefined,
     setting: AutoSetting,
     label: string,
     ev: Event
@@ -583,8 +659,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(
       auto.run_hours
     );
-    const range =
-      auto.window_enabled && auto.window_start !== auto.window_end
+    const range = auto.windows
+      ? windowsSummary(auto.windows)
+      : auto.window_enabled && auto.window_start !== auto.window_end
         ? ` · ${auto.window_start}–${auto.window_end}`
         : '';
     const runs = auto.runs_limited
@@ -627,7 +704,18 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
             )}
         />
       </label>
-      <label class="setting">
+      ${auto.windows ? nothing : this._renderDailySettings(auto)}
+      ${auto.windows ? this._renderWindows(auto.windows) : nothing}
+      ${auto.windows || auto.window_enabled_entity === undefined
+        ? nothing
+        : this._renderHourRange(auto)}
+      ${auto.runs_limited_entity === undefined ? nothing : this._renderRunLimit(auto)}
+    </div>`;
+  }
+
+  /** The per-day settings of an integration from before time windows. */
+  private _renderDailySettings(auto: AutoSnapshot): TemplateResult {
+    return html`<label class="setting">
         <span class="setting-label">Hours per day</span>
         <input
           type="number"
@@ -667,9 +755,105 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
             this._setAutoSetting(auto.cheap_price_entity, 'cheap_price', 'cheap price', ev)}
         />
         <span class="setting-hint">Always run at or below this. 0 = off</span>
+      </label>`;
+  }
+
+  private _renderWindows(windows: AutoWindow[]): TemplateResult {
+    const service = this._setWindowsService;
+    const disabled = !hasService(this.hass!, service);
+    return html`<div class="settings-windows">
+      <div class="settings-windows-header">
+        <span class="setting-label">Time windows</span>
+        <span class="setting-hint"
+          >Each runs for its hours in its cheapest slots. Outside them the target is off.</span
+        >
+      </div>
+      ${windows.length === 0
+        ? html`<span class="setting-hint">No windows, so auto mode runs nothing.</span>`
+        : nothing}
+      ${windows.map((window, index) => this._renderWindow(window, index, disabled))}
+      <button
+        class="text-button"
+        ?disabled=${disabled}
+        title=${disabled ? `${service} isn't available here` : 'Add a time window'}
+        @click=${() => this._setWindows([...windows, NEW_WINDOW], 'add a time window')}
+      >
+        ${plusIcon('button-icon')} Add window
+      </button>
+    </div>`;
+  }
+
+  private _renderWindow(window: AutoWindow, index: number, disabled: boolean): TemplateResult {
+    const windows = this._data!.auto.windows!;
+    return html`<div class="settings-window">
+      <label class="setting">
+        <span class="setting-label">From</span>
+        <input
+          type="time"
+          step="900"
+          .value=${window.start}
+          ?disabled=${disabled}
+          @change=${(ev: Event) => this._editWindow(index, 'start', ev)}
+        />
       </label>
-      ${auto.window_enabled_entity === undefined ? nothing : this._renderHourRange(auto)}
-      ${auto.runs_limited_entity === undefined ? nothing : this._renderRunLimit(auto)}
+      <label class="setting">
+        <span class="setting-label">To</span>
+        <input
+          type="time"
+          step="900"
+          .value=${window.end}
+          ?disabled=${disabled}
+          @change=${(ev: Event) => this._editWindow(index, 'end', ev)}
+        />
+      </label>
+      <label class="setting">
+        <span class="setting-label">Run for, h</span>
+        <input
+          type="number"
+          min="0"
+          max="24"
+          step="0.25"
+          .value=${String(window.hours)}
+          ?disabled=${disabled}
+          @change=${(ev: Event) => this._editWindow(index, 'hours', ev)}
+        />
+      </label>
+      <label class="setting">
+        <span class="setting-label">Max price</span>
+        <input
+          type="number"
+          min="0"
+          max="1000"
+          step="0.01"
+          .value=${String(window.max_price)}
+          ?disabled=${disabled}
+          @change=${(ev: Event) => this._editWindow(index, 'max_price', ev)}
+        />
+      </label>
+      <label class="setting">
+        <span class="setting-label">Cheap price</span>
+        <input
+          type="number"
+          min="0"
+          max="1000"
+          step="0.01"
+          .value=${String(window.cheap_price)}
+          ?disabled=${disabled}
+          @change=${(ev: Event) => this._editWindow(index, 'cheap_price', ev)}
+        />
+      </label>
+      <button
+        class="icon-button settings-window-remove"
+        title="Remove this window"
+        ?disabled=${disabled}
+        @click=${() =>
+          this._setWindows(
+            windows.filter((_, i) => i !== index),
+            'remove the time window'
+          )}
+      >
+        ${deleteIcon('button-icon')}
+      </button>
     </div>`;
   }
 

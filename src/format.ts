@@ -1,4 +1,5 @@
 import type {
+  AutoWindow,
   AverageWindow,
   RenderSlot,
   ScheduleSnapshot,
@@ -147,4 +148,25 @@ export function buildRenderSlots(
 export function dropPastRows(slots: RenderSlot[], rowSize: number): RenderSlot[] {
   const current = slots.findIndex((s) => s.isCurrent);
   return current < 0 ? slots : slots.slice(current - (current % rowSize));
+}
+
+/** Whether a time window covers the whole day: From equal to To, or 00:00 to 23:59. */
+export function isWholeDay(window: AutoWindow): boolean {
+  return window.start === window.end || (window.start === '00:00' && window.end === '23:59');
+}
+
+/** What the auto chip adds for the windows: a lone window's range, or how many there are. */
+export function windowsSummary(windows: AutoWindow[]): string {
+  if (windows.length === 1) {
+    return isWholeDay(windows[0]) ? '' : ` · ${windows[0].start}–${windows[0].end}`;
+  }
+  return ` · ${windows.length} windows`;
+}
+
+/** Hours as "45 min", "1 h" or "1.5 h". */
+export function formatHours(hours: number, locale: string): string {
+  if (hours > 0 && hours < 1) {
+    return `${Math.round(hours * 60)} min`;
+  }
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(hours)} h`;
 }

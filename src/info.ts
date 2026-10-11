@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from 'lit';
 
-import type { NordpoolSchedulerCardConfig, ScheduleSnapshot } from './types';
-import { AVERAGE_LABELS, formatPrice } from './format';
+import type { AutoWindow, NordpoolSchedulerCardConfig, ScheduleSnapshot } from './types';
+import { AVERAGE_LABELS, formatHours, formatPrice, isWholeDay } from './format';
 import { handIcon, robotIcon, stopIcon } from './icons';
 
 // Every user-facing feature of the card and the integration is explained here.
@@ -19,9 +19,15 @@ export function renderInfo(ctx: InfoContext): TemplateResult {
   const pricesOnly = ctx.data?.target_entity === null;
   return html`
     ${ctx.data ? renderThisScheduler(ctx.data, ctx.locale, ctx.mirrored) : nothing}
-    ${pricesOnly ? renderPricesOnly() : renderScheduling()} ${renderNumbers(pricesOnly)}
-    ${renderCardOptions(ctx.config, pricesOnly)} ${renderOtherInstance(pricesOnly)}
+    ${pricesOnly ? renderPricesOnly() : renderScheduling(hasWindows(ctx.data))}
+    ${renderNumbers(pricesOnly)} ${renderCardOptions(ctx.config, pricesOnly)}
+    ${renderOtherInstance(pricesOnly)}
   `;
+}
+
+/** Whether the integration runs auto mode in time windows; assume so until it says. */
+function hasWindows(data: ScheduleSnapshot | undefined): boolean {
+  return !data || data.auto.windows !== undefined;
 }
 
 function fact(label: string, value: string): TemplateResult {
@@ -49,8 +55,36 @@ function renderThisScheduler(
   }
   const auto = data.auto;
   const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(auto.run_hours);
+  const runLimit =
+    auto.runs_limited_entity === undefined
+      ? nothing
+      : fact('Run limit', auto.runs_limited ? `On, ${auto.max_runs ?? 1} per day` : 'Off');
+  const common = html`${fact('Target', data.target_entity)}
+  ${fact('Default state', data.default_state === 'on' ? 'On' : 'Off')}
+  ${fact(
+    'Manual toggles',
+    data.control_mode === 'enforce'
+      ? 'Enforce every 15 minutes'
+      : 'Only act when the schedule changes'
+  )}`;
+  const rest = html`${data.stop_entity === undefined
+    ? nothing
+    : fact('Stop sensor', stopSensor(data))}
+  ${fact('VAT', vat)} ${mirrored ? fact('Runs on', 'Another Home Assistant instance') : nothing}`;
+  if (auto.windows) {
+    return html`<section>
+      <h3>This scheduler</h3>
+      <dl class="info-facts">
+        ${common} ${fact('Auto mode', auto.enabled ? `On, ${hours} h per day` : 'Off')}
+        ${auto.windows.length === 0
+          ? fact('Time windows', 'None, so auto mode runs nothing')
+          : nothing}
+        ${auto.windows.map((window, i) => fact(`Window ${i + 1}`, describeWindow(window, locale)))}
+        ${runLimit} ${rest}
+      </dl>
+    </section>`;
+  }
   const hasRange = auto.window_enabled_entity !== undefined;
-  const hasRunLimit = auto.runs_limited_entity !== undefined;
   const range =
     auto.window_start === auto.window_end
       ? 'On, whole day (From equals To)'
@@ -58,17 +92,9 @@ function renderThisScheduler(
   return html`<section>
     <h3>This scheduler</h3>
     <dl class="info-facts">
-      ${fact('Target', data.target_entity)}
-      ${fact('Default state', data.default_state === 'on' ? 'On' : 'Off')}
-      ${fact(
-        'Manual toggles',
-        data.control_mode === 'enforce'
-          ? 'Enforce every 15 minutes'
-          : 'Only act when the schedule changes'
-      )}
-      ${fact('Auto mode', auto.enabled ? `On, ${hours} h per day` : 'Off')}
-      ${fact('Max price', limit(auto.max_price, locale))}
-      ${fact('Cheap price', limit(auto.cheap_price, locale))}
+      ${common} ${fact('Auto mode', auto.enabled ? `On, ${hours} h per day` : 'Off')}
+      ${fact('Max price', limit(auto.max_price ?? 0, locale))}
+      ${fact('Cheap price', limit(auto.cheap_price ?? 0, locale))}
       ${hasRange ? fact('Hour range', auto.window_enabled ? range : 'Off') : nothing}
       ${hasRange
         ? fact(
@@ -78,13 +104,26 @@ function renderThisScheduler(
               : `${onOff(auto.cheap_all_day)}, applies once the hour range is on`
           )
         : nothing}
-      ${hasRunLimit
-        ? fact('Run limit', auto.runs_limited ? `On, ${auto.max_runs ?? 1} per day` : 'Off')
-        : nothing}
-      ${data.stop_entity === undefined ? nothing : fact('Stop sensor', stopSensor(data))}
-      ${fact('VAT', vat)} ${mirrored ? fact('Runs on', 'Another Home Assistant instance') : nothing}
+      ${runLimit} ${rest}
     </dl>
   </section>`;
+}
+
+/** A window as one line: "06:00–08:00 · 45 min · max 25.00 c/kWh". */
+function describeWindow(window: AutoWindow, locale: string): string {
+  const parts = [
+    isWholeDay(window)
+      ? `Whole day (${window.start}–${window.end})`
+      : `${window.start}–${window.end}`,
+    formatHours(window.hours, locale),
+  ];
+  if (window.max_price > 0) {
+    parts.push(`max ${formatPrice(window.max_price, locale)}`);
+  }
+  if (window.cheap_price > 0) {
+    parts.push(`cheap at ${formatPrice(window.cheap_price, locale)} or less`);
+  }
+  return parts.join(' · ');
 }
 
 function stopSensor(data: ScheduleSnapshot): string {
@@ -96,7 +135,7 @@ function stopSensor(data: ScheduleSnapshot): string {
     : `${data.stop_entity}, off`;
 }
 
-function renderScheduling(): TemplateResult {
+function renderScheduling(windows: boolean): TemplateResult {
   return html`
     <section>
       <h3>What decides a slot</h3>
@@ -163,6 +202,258 @@ function renderScheduling(): TemplateResult {
       </p>
     </section>
 
+    ${windows ? renderAutoWindows() : renderDailyAuto()}
+
+    <section>
+      <h3>Stop sensor</h3>
+      <p>
+        Under the integration's <strong>Configure</strong> you can pick a
+        <strong>Stop sensor</strong>: a binary sensor, input boolean or switch. While it is on, the
+        target is kept off whatever the slot says, so floor heating stops once the room is warm
+        enough however cheap the price. The scheduler doesn't read temperatures itself: a Threshold
+        helper on a temperature sensor makes a good stop sensor.
+      </p>
+      <ul>
+        <li>
+          ${stopIcon('info-icon stop')} A red <strong>Stopped</strong> chip in the header shows
+          while it is on and the scheduler is enabled. With <strong>Scheduler enabled</strong> off,
+          the stop sensor does nothing either.
+        </li>
+        <li>
+          It wins over auto mode's picks, the default state and your overrides. The grid keeps
+          showing what the schedule wants, so its borders don't change while stopped.
+        </li>
+        <li>
+          The target turns off as soon as it turns on, and the current slot applies again as soon as
+          it turns off, without waiting for the next quarter hour.
+        </li>
+        <li>Auto mode doesn't pick extra slots to make up for the time it was stopped.</li>
+        <li>While it is unavailable it is ignored, and the schedule carries on.</li>
+        <li>
+          With <strong>Only act when the schedule changes</strong>, the target is brought in line
+          when the stop starts, when it ends, and at a restart while it is on, so a target turned on
+          by hand is turned off too. A manual toggle in between is left alone. With
+          <strong>Enforce every 15 minutes</strong>, it is turned off again at every slot.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Manual toggles</h3>
+      <p>
+        What happens when someone switches the target by hand is set under the integration's
+        <strong>Configure</strong>:
+      </p>
+      <ul>
+        <li>
+          <strong>Only act when the schedule changes</strong> leaves the target alone until the
+          schedule wants something different from the previous slot, or you change the current slot.
+          This holds across restarts.
+        </li>
+        <li>
+          <strong>Enforce every 15 minutes</strong> puts the target back in line with the schedule
+          at every slot.
+        </li>
+      </ul>
+    </section>
+  `;
+}
+
+function renderAutoWindows(): TemplateResult {
+  return html`
+    <section>
+      <h3>Auto mode</h3>
+      <p>
+        With auto mode on, the target runs in a list of <strong>time windows</strong>. Each window
+        runs for its own time in the cheapest slots inside it, and outside every window the target
+        is off.
+      </p>
+      <p>
+        The chip in the header turns auto mode on or off and shows the hours per day, which is all
+        the windows' hours added up. It also shows a lone window's times, or how many windows there
+        are, and the run limit when it is on. The gear opens the settings, where you add, change and
+        remove windows. Changes take effect at once.
+      </p>
+      <p>Set once for the whole scheduler:</p>
+      <ul>
+        <li><strong>Auto mode</strong>, on or off.</li>
+        <li><strong>Limit runs</strong> and <strong>Runs per day</strong>, see Run limit below.</li>
+      </ul>
+      <p>Set on each window:</p>
+      <ul>
+        <li><strong>From</strong> and <strong>To</strong>: the time of day it covers.</li>
+        <li><strong>Run for</strong>: how many hours it runs, in its cheapest slots.</li>
+        <li><strong>Max price</strong>: its slots above this price don't run. 0 turns it off.</li>
+        <li>
+          <strong>Cheap price</strong>: its slots at or below this price run too, even past its
+          hours. 0 turns it off.
+        </li>
+      </ul>
+      <p>
+        A new scheduler has one window, 00:00 to 23:59 for 2 hours with no prices set: the target
+        runs in the two cheapest hours of each day.
+      </p>
+    </section>
+
+    <section>
+      <h3>Time windows</h3>
+      <ul>
+        <li>
+          A To before From wraps past midnight: 20:00 to 00:00 is 20:00 to midnight, and 22:00 to
+          06:00 covers that day's 00:00–06:00 and 22:00–midnight. From equal to To, or 00:00 to
+          23:59, is the whole day.
+        </li>
+        <li>
+          Each day, midnight to midnight, is picked on its own. A tie between equal prices goes to
+          the earlier slot.
+        </li>
+        <li>
+          The narrowest window picks first, so a morning window gets its slots before a whole-day
+          window fills in around it. A slot one window picked isn't picked again by another.
+        </li>
+        <li>
+          On an expensive day a window can run for less than its hours, or not at all, because it
+          never runs a slot above its max price.
+        </li>
+        <li>
+          A window that runs for 0 hours picks nothing, but its cheap price still applies. A
+          whole-day window with 0 hours and a cheap price runs every cheap slot of the day.
+        </li>
+        <li>
+          A day is only picked once every one of its slots has a price. Until then, for example
+          tomorrow before Nord Pool publishes, slots inside a window that runs for some time follow
+          the default state, and every other slot is off.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Run limit</h3>
+      <p>
+        With <strong>Limit runs</strong> on, each window runs its hours back to back, and the day
+        makes at most <strong>Runs per day</strong> separate runs. Use it for a target like a boiler
+        or floor heating that shouldn't start often.
+      </p>
+      <ul>
+        <li>
+          Every window that runs for some time gets at least one run. Narrower windows go first, and
+          a window only takes more than one run when enough are left for the windows after it.
+        </li>
+        <li>
+          With more such windows than runs per day, each window still gets its one run, so the day
+          runs more often than the limit.
+        </li>
+        <li>
+          Slots that join onto a run another window already made lengthen that run, and don't count
+          as another one.
+        </li>
+        <li>A run never spans a slot above its window's max price.</li>
+        <li>
+          A slot at or below a cheap price only runs when it lengthens a run, never as a run of its
+          own.
+        </li>
+        <li>A window that wraps past midnight is two stretches of the same day.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Example: morning, evening and once more</h3>
+      <p>Bathroom floor heating, with Limit runs on, 3 runs per day and three windows:</p>
+      <ul>
+        <li>06:00 to 08:00, run for 45 min, max price 25</li>
+        <li>19:00 to 22:00, run for 1 h, max price 15, cheap price 3</li>
+        <li>00:00 to 23:59, run for 15 min, max price 15</li>
+      </ul>
+      <ol>
+        <li>
+          06:00 to 08:00 is the narrowest window, so it goes first: the cheapest 45 unbroken minutes
+          between 06:00 and 08:00, as long as no slot costs more than 25 c/kWh.
+        </li>
+        <li>
+          19:00 to 22:00 goes next: its cheapest unbroken hour at no more than 15 c/kWh. A slot
+          right next to that hour at 3 c/kWh or less runs too.
+        </li>
+        <li>
+          The whole-day window takes the third run: its cheapest 15 minutes anywhere in the day at
+          no more than 15 c/kWh. If that slot sits right next to the morning or evening run, it
+          lengthens that run instead.
+        </li>
+        <li>
+          On a day when nothing outside the morning costs 15 c/kWh or less, only the morning run
+          happens: its window allows up to 25.
+        </li>
+        <li>
+          Your overrides go on top: click a 12:00 slot to run it anyway, or a picked 20:00 slot to
+          skip it.
+        </li>
+      </ol>
+      <p>
+        Add a stop sensor that turns on when the bathroom passes 26 °C. If that happens at 06:30
+        during the morning run, the target goes off at once and stays off until the bathroom cools
+        and the sensor turns off. The time lost isn't made up later.
+      </p>
+    </section>
+
+    <section>
+      <h3>Example: one evening run, and up to two more</h3>
+      <p>Limit runs on, 3 runs per day and two windows:</p>
+      <ul>
+        <li>20:00 to 00:00, run for 1 h</li>
+        <li>00:00 to 23:59, run for 1.5 h</li>
+      </ul>
+      <ol>
+        <li>
+          The evening window is the narrower one, so its cheapest hour between 20:00 and midnight is
+          picked first, as one run.
+        </li>
+        <li>
+          That leaves two runs for the whole-day window. Its 1.5 hours go to the cheapest slots in
+          at most two stretches: two short runs, one longer run, or added onto the evening run.
+        </li>
+        <li>
+          Two more runs is the most it makes, not a promise. For exactly two more, use two windows
+          instead, such as 00:00 to 12:00 and 12:00 to 20:00. To keep them out of the evening, end
+          the whole-day window at 20:00.
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h3>Example: a set time, plus every cheap slot</h3>
+      <p>Two windows:</p>
+      <ul>
+        <li>17:00 to 23:00, run for 2 h</li>
+        <li>00:00 to 23:59, run for 0 h, cheap price 3</li>
+      </ul>
+      <p>
+        The target runs in the two cheapest hours between 17:00 and 23:00, and in every slot of the
+        day at 3 c/kWh or less. With Limit runs on, those cheap slots only run when they lengthen
+        the evening run.
+      </p>
+    </section>
+
+    <section>
+      <h3>Coming from an older version</h3>
+      <p>
+        Auto mode used to have one hours per day, max price and cheap price for the whole day, an
+        hour range and cheap price all day. Updating the integration turned them into windows that
+        pick exactly the same slots:
+      </p>
+      <ul>
+        <li>Without an hour range: one window, 00:00 to 23:59, with the same hours and prices.</li>
+        <li>
+          With an hour range: one window over the range. With cheap price all day on too, a second
+          window, 00:00 to 23:59 for 0 hours with the same prices, keeps the cheap slots outside the
+          range running.
+        </li>
+      </ul>
+    </section>
+  `;
+}
+
+/** Auto mode of an integration from before time windows. */
+function renderDailyAuto(): TemplateResult {
+  return html`
     <section>
       <h3>Auto mode</h3>
       <p>
@@ -262,59 +553,6 @@ function renderScheduling(): TemplateResult {
         sensor turns off, even through a 22:00 slot you clicked to run. The time lost isn't made up
         later.
       </p>
-    </section>
-
-    <section>
-      <h3>Stop sensor</h3>
-      <p>
-        Under the integration's <strong>Configure</strong> you can pick a
-        <strong>Stop sensor</strong>: a binary sensor, input boolean or switch. While it is on, the
-        target is kept off whatever the slot says, so floor heating stops once the room is warm
-        enough however cheap the price. The scheduler doesn't read temperatures itself: a Threshold
-        helper on a temperature sensor makes a good stop sensor.
-      </p>
-      <ul>
-        <li>
-          ${stopIcon('info-icon stop')} A red <strong>Stopped</strong> chip in the header shows
-          while it is on and the scheduler is enabled. With <strong>Scheduler enabled</strong> off,
-          the stop sensor does nothing either.
-        </li>
-        <li>
-          It wins over auto mode's picks, the default state and your overrides. The grid keeps
-          showing what the schedule wants, so its borders don't change while stopped.
-        </li>
-        <li>
-          The target turns off as soon as it turns on, and the current slot applies again as soon as
-          it turns off, without waiting for the next quarter hour.
-        </li>
-        <li>Auto mode doesn't pick extra slots to make up for the time it was stopped.</li>
-        <li>While it is unavailable it is ignored, and the schedule carries on.</li>
-        <li>
-          With <strong>Only act when the schedule changes</strong>, the target is brought in line
-          when the stop starts, when it ends, and at a restart while it is on, so a target turned on
-          by hand is turned off too. A manual toggle in between is left alone. With
-          <strong>Enforce every 15 minutes</strong>, it is turned off again at every slot.
-        </li>
-      </ul>
-    </section>
-
-    <section>
-      <h3>Manual toggles</h3>
-      <p>
-        What happens when someone switches the target by hand is set under the integration's
-        <strong>Configure</strong>:
-      </p>
-      <ul>
-        <li>
-          <strong>Only act when the schedule changes</strong> leaves the target alone until the
-          schedule wants something different from the previous slot, or you change the current slot.
-          This holds across restarts.
-        </li>
-        <li>
-          <strong>Enforce every 15 minutes</strong> puts the target back in line with the schedule
-          at every slot.
-        </li>
-      </ul>
     </section>
   `;
 }
@@ -420,9 +658,10 @@ function renderOtherInstance(pricesOnly: boolean): TemplateResult {
       ${pricesOnly
         ? nothing
         : html`Clicking a slot goes through Remote Home-Assistant's proxy for
-            <code>nordpool_scheduler.set_slots</code>. The auto mode controls need its switches,
-            numbers and times mirrored too, and the history bar needs the target mirrored and
-            recorded here.`}
+            <code>nordpool_scheduler.set_slots</code>, and changing the time windows through its
+            proxy for <code>nordpool_scheduler.set_auto_windows</code>. The auto mode and run limit
+            controls need their switches and number mirrored too, and the history bar needs the
+            target mirrored and recorded here.`}
     </p>
   </section>`;
 }

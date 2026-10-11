@@ -11,6 +11,8 @@ export interface HomeAssistant {
   entities?: Record<string, { platform?: string }>;
   connection: Connection;
   locale: { language: string };
+  /** The services this instance has, by domain. */
+  services?: Record<string, Record<string, unknown>>;
   localize(key: string): string;
   callService(
     domain: string,
@@ -85,16 +87,30 @@ export interface SlotSnapshot {
   effective: SlotState;
 }
 
+/** One time window auto mode runs in. Prices are in cents/kWh, and 0 turns one off. */
+export interface AutoWindow {
+  /** "HH:MM" in the scheduler's time zone. */
+  start: string;
+  end: string;
+  hours: number;
+  max_price: number;
+  cheap_price: number;
+}
+
 /** Auto mode's state and settings, and the entities that hold them. */
 export interface AutoSnapshot {
   enabled: boolean;
   switch_entity: string | null;
+  /** The windows' hours added up, or the hours per day setting before windows. */
   run_hours: number;
-  max_price: number;
-  cheap_price: number;
-  run_hours_entity: string | null;
-  max_price_entity: string | null;
-  cheap_price_entity: string | null;
+  /** Missing when the integration predates them, which also means the fields below them are sent. */
+  windows?: AutoWindow[];
+  /** The per-day settings that windows replaced, sent by older integrations only. */
+  max_price?: number;
+  cheap_price?: number;
+  run_hours_entity?: string | null;
+  max_price_entity?: string | null;
+  cheap_price_entity?: string | null;
   /** The hour range fields are missing when the integration predates them. */
   window_enabled?: boolean;
   /** "HH:MM" in the scheduler's time zone. */

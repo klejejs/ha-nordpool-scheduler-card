@@ -120,6 +120,62 @@ export const sharedStyles = css`
     justify-content: flex-start;
   }
 
+  .settings-windows {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--np-spacing);
+  }
+
+  .settings-windows-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .settings-window {
+    align-self: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--np-spacing);
+    padding: var(--np-spacing);
+    border: 1px solid var(--divider-color);
+    border-radius: var(--np-radius);
+    background: var(--card-background-color);
+  }
+
+  @container (min-width: 520px) {
+    .settings-window {
+      grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+      align-items: end;
+    }
+  }
+
+  .settings-window-remove {
+    justify-self: end;
+    align-self: end;
+  }
+
+  .text-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px 6px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 18px;
+    background: var(--card-background-color);
+    color: var(--primary-color);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .text-button:disabled,
+  .icon-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
   .setting {
     display: flex;
     flex-direction: column;
