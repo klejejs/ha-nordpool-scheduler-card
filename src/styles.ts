@@ -55,8 +55,8 @@ export const sharedStyles = css`
     gap: 4px;
     padding: 4px 10px;
     border-radius: 16px;
-    background: var(--np-stop-color);
-    color: var(--text-primary-color, #fff);
+    background: color-mix(in srgb, var(--np-stop-color) 80%, black);
+    color: #fff;
     font-size: 0.8em;
     font-weight: 500;
   }

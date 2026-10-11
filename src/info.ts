@@ -133,7 +133,7 @@ function renderScheduling(): TemplateResult {
         </li>
         <li>
           <span class="legend-swatch"></span> A thick blue border means the target runs in that
-          slot.
+          slot, unless the stop sensor holds it off.
         </li>
         <li>
           ${robotIcon('info-icon auto')} A robot in the top-left marks a slot auto mode picked. It
@@ -258,8 +258,9 @@ function renderScheduling(): TemplateResult {
       </p>
       <p>
         Add a stop sensor that turns on when the bathroom passes 26 °C. If that happens at 18:30
-        during the run, the target goes off at once and stays off, your 12:00 override included,
-        until the bathroom cools and the sensor turns off. The time lost isn't made up later.
+        during the run, the target goes off at once and stays off until the bathroom cools and the
+        sensor turns off, even through a 22:00 slot you clicked to run. The time lost isn't made up
+        later.
       </p>
     </section>
 
@@ -275,11 +276,12 @@ function renderScheduling(): TemplateResult {
       <ul>
         <li>
           ${stopIcon('info-icon stop')} A red <strong>Stopped</strong> chip in the header shows
-          while it is on.
+          while it is on and the scheduler is enabled. With <strong>Scheduler enabled</strong> off,
+          the stop sensor does nothing either.
         </li>
         <li>
           It wins over auto mode's picks, the default state and your overrides. The grid keeps
-          showing what would run.
+          showing what the schedule wants, so its borders don't change while stopped.
         </li>
         <li>
           The target turns off as soon as it turns on, and the current slot applies again as soon as

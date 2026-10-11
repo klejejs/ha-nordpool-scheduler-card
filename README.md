@@ -87,11 +87,11 @@ The chip in the header shows whether the scheduler's auto mode is on: blue with 
 
 ### Stop sensor
 
-A red **Stopped** chip shows in the header while the scheduler's stop sensor is on. The stop sensor is a binary sensor, input boolean or switch picked under the integration's **Configure**, for example a Threshold helper that turns on once a bathroom passes 26 °C. While it is on the target is kept off, whatever auto mode, the default state or your overrides say, and the grid keeps showing what would run. The target turns off and back on as soon as the sensor changes, and auto mode doesn't make up the time lost. An unavailable stop sensor is ignored.
+A red **Stopped** chip shows in the header while the scheduler's stop sensor is on. The stop sensor is a binary sensor, input boolean or switch picked under the integration's **Configure**, for example a Threshold helper that turns on once a bathroom passes 26 °C. While it is on the target is kept off, whatever auto mode, the default state or your overrides say. The grid keeps showing what the schedule wants, so its borders don't change while stopped. The target is brought in line as soon as the sensor changes, and auto mode doesn't make up the time lost. With **Only act when the schedule changes**, a manual toggle while stopped is left alone until the sensor changes again; with **Enforce every 15 minutes**, the target is turned off again at every slot. An unavailable stop sensor is ignored, and so is the stop sensor while the scheduler is disabled.
 
 ### Slots
 
-The border shows what the slot will actually do: a thick blue border means the entity runs.
+The border shows what the slot will actually do: a thick blue border means the entity runs, unless the [stop sensor](#stop-sensor) holds it off.
 
 - A robot in the top-left corner marks a slot auto mode picked. It is only shown while auto mode is on.
 - An orange hand in the top-right corner and a dashed border mark your own override. An override that runs the entity has an orange border.
