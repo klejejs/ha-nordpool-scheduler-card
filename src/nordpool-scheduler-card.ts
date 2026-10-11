@@ -98,8 +98,6 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   /** The windows last sent to set_auto_windows, until a snapshot carries them. */
   @state() private _pendingWindows?: AutoWindow[];
 
-  private _windowCalls = 0;
-
   @query('.info-dialog') private _infoDialog?: HTMLDialogElement;
 
   private _pending = new Map<string, SetSlotState>();
@@ -293,8 +291,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._data = data;
     if (
       this._pendingWindows &&
-      (this._windowCalls === 0 ||
-        JSON.stringify(data.auto.windows) === JSON.stringify(this._pendingWindows))
+      JSON.stringify(data.auto.windows) === JSON.stringify(this._pendingWindows)
     ) {
       this._pendingWindows = undefined;
     }
@@ -495,17 +492,16 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)
     );
     this._pendingWindows = sorted;
-    this._windowCalls++;
     const [domain, service] = this._setWindowsService.split('.', 2);
     this.hass
       .callService(domain, service, { config_entry: this._data.config_entry_id, windows: sorted })
       .catch((err: unknown) => {
-        this._pendingWindows = undefined;
-        revert?.();
+        // A newer list sent since then stays pending; it carries this edit's intent anyway.
+        if (this._pendingWindows === sorted) {
+          this._pendingWindows = undefined;
+          revert?.();
+        }
         this._actionError = `Could not ${failed}: ${errorMessage(err)}`;
-      })
-      .finally(() => {
-        this._windowCalls--;
       });
   }
 
