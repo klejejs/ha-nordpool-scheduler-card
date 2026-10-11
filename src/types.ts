@@ -131,6 +131,10 @@ export interface ScheduleSnapshot {
   vat_percent: number;
   now_slot_start: string;
   target_state: string | null;
+  /** The stop fields are missing when the integration predates them. */
+  stop_entity?: string | null;
+  /** The stop entity is on, so the target is held off whatever the slots say. */
+  stopped?: boolean;
   auto: AutoSnapshot;
   /** Missing when the integration predates the average price sensors. */
   averages?: Partial<Record<AverageWindow, AverageSnapshot>>;
