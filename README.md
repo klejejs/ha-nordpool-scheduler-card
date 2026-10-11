@@ -93,7 +93,7 @@ Auto mode runs the target in a list of **time windows**. Outside every window th
 |---|---|
 | **Auto mode**, on or off | **From** and **To**, the time of day it covers. A To before From wraps past midnight, and 00:00 to 23:59 is the whole day. |
 | **Limit runs**, on or off | **Run for**, the hours it runs in its cheapest slots |
-| **Runs per day** | **Max price**: its slots above this don't run. 0 turns it off. |
+| **Runs per day** | **Max price**: the slots it picks for its hours are never above this. With **Limit runs** off, a cheap price set above it still runs those cheap slots. 0 turns it off. |
 | | **Cheap price**: its slots at or below this run too. 0 turns it off. |
 
 Click **Add window** to add one, and the bin to remove one. The narrowest window picks first. With **Limit runs** on, each window runs its hours back to back and gets at least one run, and the day makes at most **Runs per day** runs, so three windows and 3 runs per day give, for example, one morning run, one evening run and one run wherever it's cheapest. The chip shows the hours of all the windows added up, a lone window's times or how many windows there are, and the run limit.

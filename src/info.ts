@@ -283,7 +283,10 @@ function renderAutoWindows(): TemplateResult {
       <ul>
         <li><strong>From</strong> and <strong>To</strong>: the time of day it covers.</li>
         <li><strong>Run for</strong>: how many hours it runs, in its cheapest slots.</li>
-        <li><strong>Max price</strong>: its slots above this price don't run. 0 turns it off.</li>
+        <li>
+          <strong>Max price</strong>: the slots it picks for its hours are never above this price. 0
+          turns it off.
+        </li>
         <li>
           <strong>Cheap price</strong>: its slots at or below this price run too, even past its
           hours. 0 turns it off.
@@ -313,7 +316,11 @@ function renderAutoWindows(): TemplateResult {
         </li>
         <li>
           On an expensive day a window can run for less than its hours, or not at all, because it
-          never runs a slot above its max price.
+          never picks a slot above its max price for its hours.
+        </li>
+        <li>
+          A cheap price set above the max price still runs those cheap slots while Limit runs is
+          off. With Limit runs on, cheap slots stay at or below the max price too.
         </li>
         <li>
           A window that runs for 0 hours picks nothing, but its cheap price still applies. A
@@ -435,9 +442,9 @@ function renderAutoWindows(): TemplateResult {
     <section>
       <h3>Coming from an older version</h3>
       <p>
-        Auto mode used to have one hours per day, max price and cheap price for the whole day, an
-        hour range and cheap price all day. Updating the integration turned them into windows that
-        pick exactly the same slots:
+        Auto mode used to have a single hours per day setting, max price and cheap price for the
+        whole day, an hour range and cheap price all day. Updating the integration turned them into
+        windows that pick exactly the same slots:
       </p>
       <ul>
         <li>Without an hour range: one window, 00:00 to 23:59, with the same hours and prices.</li>

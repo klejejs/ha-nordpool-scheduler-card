@@ -95,6 +95,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   @state() private _showSettings = false;
 
+  /** The windows last sent to set_auto_windows, until a snapshot carries them. */
+  @state() private _pendingWindows?: AutoWindow[];
+
+  private _windowCalls = 0;
+
   @query('.info-dialog') private _infoDialog?: HTMLDialogElement;
 
   private _pending = new Map<string, SetSlotState>();
@@ -286,6 +291,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _applySnapshot(data: ScheduleSnapshot): void {
     this._data = data;
+    if (
+      this._pendingWindows &&
+      (this._windowCalls === 0 ||
+        JSON.stringify(data.auto.windows) === JSON.stringify(this._pendingWindows))
+    ) {
+      this._pendingWindows = undefined;
+    }
     for (const [start, requested] of this._pending) {
       const slot = data.slots.find((s) => s.start === start);
       if (!slot) {
@@ -469,21 +481,36 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       : 'nordpool_scheduler.set_auto_windows';
   }
 
+  /** The windows to show and edit: the ones being saved, or else the snapshot's. */
+  private get _windows(): AutoWindow[] | undefined {
+    return this._pendingWindows ?? this._data?.auto.windows;
+  }
+
   private _setWindows(windows: AutoWindow[], failed: string, revert?: () => void): void {
     if (!this.hass || !this._data) {
       return;
     }
+    // Sorted as the integration stores them, so the snapshot that confirms them compares equal.
+    const sorted = [...windows].sort(
+      (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)
+    );
+    this._pendingWindows = sorted;
+    this._windowCalls++;
     const [domain, service] = this._setWindowsService.split('.', 2);
     this.hass
-      .callService(domain, service, { config_entry: this._data.config_entry_id, windows })
+      .callService(domain, service, { config_entry: this._data.config_entry_id, windows: sorted })
       .catch((err: unknown) => {
+        this._pendingWindows = undefined;
         revert?.();
         this._actionError = `Could not ${failed}: ${errorMessage(err)}`;
+      })
+      .finally(() => {
+        this._windowCalls--;
       });
   }
 
   private _editWindow(index: number, field: WindowField, ev: Event): void {
-    const windows = this._data?.auto.windows;
+    const windows = this._windows;
     if (!windows) {
       return;
     }
@@ -705,7 +732,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         />
       </label>
       ${auto.windows ? nothing : this._renderDailySettings(auto)}
-      ${auto.windows ? this._renderWindows(auto.windows) : nothing}
+      ${auto.windows ? this._renderWindows(this._windows!) : nothing}
       ${auto.windows || auto.window_enabled_entity === undefined
         ? nothing
         : this._renderHourRange(auto)}
@@ -784,7 +811,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private _renderWindow(window: AutoWindow, index: number, disabled: boolean): TemplateResult {
-    const windows = this._data!.auto.windows!;
+    const windows = this._windows!;
     return html`<div class="settings-window">
       <label class="setting">
         <span class="setting-label">From</span>
