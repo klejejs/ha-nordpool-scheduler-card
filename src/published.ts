@@ -44,6 +44,27 @@ export function setSlotsService(entityId: string, published: PublishedSnapshot):
   return `nordpool_scheduler.${mirrorPrefix(entityId, published.entity_id)}set_slots`;
 }
 
+/**
+ * The set_auto_windows service to call for a published snapshot read through
+ * `entityId`. A `set_slots_service` set by hand points at the same proxy prefix.
+ */
+export function setAutoWindowsService(
+  entityId: string,
+  published: PublishedSnapshot,
+  setSlotsOverride?: string
+): string {
+  if (setSlotsOverride?.endsWith('set_slots')) {
+    return `${setSlotsOverride.slice(0, -'set_slots'.length)}set_auto_windows`;
+  }
+  return `nordpool_scheduler.${mirrorPrefix(entityId, published.entity_id)}set_auto_windows`;
+}
+
+/** Whether this instance has a service, or can't tell. */
+export function hasService(hass: HomeAssistant, service: string): boolean {
+  const [domain, name] = service.split('.', 2);
+  return hass.services === undefined || Boolean(hass.services[domain]?.[name]);
+}
+
 /** Which of the snapshot's auto mode entities are mirrored here, as a string that changes when they do. */
 export function mirroredEntities(
   hass: HomeAssistant,
@@ -85,7 +106,7 @@ export function unpackSnapshot(
   published: PublishedSnapshot
 ): ScheduleSnapshot {
   const prefix = mirrorPrefix(entityId, published.entity_id);
-  const local = (remoteId: string | null): string | null => {
+  const local = (remoteId: string | null | undefined): string | null => {
     if (!remoteId) {
       return null;
     }
@@ -129,22 +150,26 @@ export function unpackSnapshot(
     auto: {
       ...auto,
       switch_entity: local(auto.switch_entity),
-      run_hours_entity: local(auto.run_hours_entity),
-      max_price_entity: local(auto.max_price_entity),
-      cheap_price_entity: local(auto.cheap_price_entity),
+      ...(auto.run_hours_entity === undefined
+        ? {}
+        : {
+            run_hours_entity: local(auto.run_hours_entity),
+            max_price_entity: local(auto.max_price_entity),
+            cheap_price_entity: local(auto.cheap_price_entity),
+          }),
       ...(auto.window_enabled_entity === undefined
         ? {}
         : {
             window_enabled_entity: local(auto.window_enabled_entity),
-            window_start_entity: local(auto.window_start_entity ?? null),
-            window_end_entity: local(auto.window_end_entity ?? null),
-            cheap_all_day_entity: local(auto.cheap_all_day_entity ?? null),
+            window_start_entity: local(auto.window_start_entity),
+            window_end_entity: local(auto.window_end_entity),
+            cheap_all_day_entity: local(auto.cheap_all_day_entity),
           }),
       ...(auto.runs_limited_entity === undefined
         ? {}
         : {
             runs_limited_entity: local(auto.runs_limited_entity),
-            max_runs_entity: local(auto.max_runs_entity ?? null),
+            max_runs_entity: local(auto.max_runs_entity),
           }),
     },
     averages: published.averages,

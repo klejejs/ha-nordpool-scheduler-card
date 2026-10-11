@@ -69,11 +69,13 @@ entity: sensor.darzs_nordpool_scheduler_boiler_schedule
 name: Boiler
 ```
 
-The card reads the schedule from that sensor's attribute, so it updates whenever Remote Home-Assistant mirrors a change. It works out the entity prefix (`darzs_` here) by comparing the sensor's ID with the one it has on the other instance, and uses it to find the mirrored auto mode switch and numbers and the target entity's history.
+The card reads the schedule from that sensor's attribute, so it updates whenever Remote Home-Assistant mirrors a change. It works out the entity prefix (`darzs_` here) by comparing the sensor's ID with the one it has on the other instance, and uses it to find the mirrored auto mode switches and number and the target entity's history.
 
 Clicking a slot calls `nordpool_scheduler.<prefix>set_slots`, e.g. `nordpool_scheduler.darzs_set_slots`. That is Remote Home-Assistant's proxy for `nordpool_scheduler.set_slots` when its service prefix matches the entity prefix. If you gave it a different service prefix, set `set_slots_service` to the proxy's full name.
 
-The auto mode controls need the switch and numbers mirrored too, and the history bar needs the target entity mirrored and recorded on this instance. While the other instance is unreachable, Remote Home-Assistant removes its entities, and the card says so until they come back.
+Changing the time windows calls `nordpool_scheduler.<prefix>set_auto_windows` the same way, so have Remote Home-Assistant proxy `nordpool_scheduler.set_auto_windows` too. With `set_slots_service` set, the card swaps its `set_slots` ending for `set_auto_windows`. Without the proxy, the windows are shown but can't be changed.
+
+The auto mode and run limit controls need their switches and number mirrored too, and the history bar needs the target entity mirrored and recorded on this instance. While the other instance is unreachable, Remote Home-Assistant removes its entities, and the card says so until they come back.
 
 ## Usage
 
@@ -83,7 +85,20 @@ The ⓘ button in the header opens **How this card works**: this scheduler's cur
 
 ### Auto mode
 
-The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Check **Hour range** to only pick hours between a start and an end time, for example 17:00 to 23:00; the chip then shows the range too. With the range on, **Cheap price all day** lets slots at or below the cheap price run outside it as well. Changes take effect at once. Check **Limit runs** to cap how many separate runs auto mode makes a day, for a target like a boiler that shouldn't start often; **Runs per day** at 1 runs the hours in one go, and the chip shows the limit. The hour range and the run limit each need a version of the integration that has them.
+The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens the settings, with the same toggle, the time windows and the run limit. Changes take effect at once.
+
+Auto mode runs the target in a list of **time windows**. Outside every window the target is off.
+
+| Set once | Set on each window |
+|---|---|
+| **Auto mode**, on or off | **From** and **To**, the time of day it covers. A To before From wraps past midnight, and 00:00 to 23:59 is the whole day. |
+| **Limit runs**, on or off | **Run for**, the hours it runs in its cheapest slots |
+| **Runs per day** | **Max price**: the slots it picks for its hours are never above this. With **Limit runs** off, a cheap price set above it still runs those cheap slots. 0 turns it off. |
+| | **Cheap price**: its slots at or below this run too. 0 turns it off. |
+
+Click **Add window** to add one, and the bin to remove one. The narrowest window picks first. With **Limit runs** on, each window runs its hours back to back and gets at least one run, and the day makes at most **Runs per day** runs, so three windows and 3 runs per day give, for example, one morning run, one evening run and one run wherever it's cheapest. The chip shows the hours of all the windows added up, a lone window's times or how many windows there are, and the run limit.
+
+The ⓘ dialog explains the rules in full with worked examples. The time windows need a version of the integration that has them; with an older one the gear shows its hours per day, prices, hour range and run limit instead.
 
 ### Stop sensor
 
