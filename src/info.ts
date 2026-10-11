@@ -288,8 +288,9 @@ function renderScheduling(): TemplateResult {
         <li>Auto mode doesn't pick extra slots to make up for the time it was stopped.</li>
         <li>While it is unavailable it is ignored, and the schedule carries on.</li>
         <li>
-          With <strong>Only act when the schedule changes</strong>, the target is switched once when
-          the stop starts and once when it ends, so a manual toggle in between is left alone. With
+          With <strong>Only act when the schedule changes</strong>, the target is brought in line
+          when the stop starts, when it ends, and at a restart while it is on, so a target turned on
+          by hand is turned off too. A manual toggle in between is left alone. With
           <strong>Enforce every 15 minutes</strong>, it is turned off again at every slot.
         </li>
       </ul>
