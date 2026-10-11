@@ -1107,7 +1107,7 @@
   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.15.tgz#596a1747233694d50f6ad8a7869fcb6f56cf5841"
   integrity sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==
 
-"@types/node@^20.8.0":
+"@types/node@20.19.19":
   version "20.19.19"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-20.19.19.tgz#18c8982becd5728f92e5f1939f2f3dc85604abcd"
   integrity sha512-pb1Uqj5WJP7wrcbLU7Ru4QtA0+3kAXrkutGiD26wUKzSMgNNaPARTUDQmElUXp64kh3cWdou3Q0C7qwwxqSFmg==
@@ -1721,7 +1721,7 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-home-assistant-js-websocket@^8.2.0:
+home-assistant-js-websocket@8.2.0:
   version "8.2.0"
   resolved "https://registry.yarnpkg.com/home-assistant-js-websocket/-/home-assistant-js-websocket-8.2.0.tgz#3505bf004cc3026c5d0cfdae5c031a44b0fcb01b"
   integrity sha512-B163iuvC1hsObkbSXm89JfjjOguyQXSQeQsGf6KQblUj9QwMgFkQt13TiCYjeFFTMzhQ8Qj3/gKx/6MnSeYUqA==
@@ -1871,7 +1871,7 @@ lit-html@^3.3.0:
   dependencies:
     "@types/trusted-types" "^2.0.2"
 
-lit@^3.0.0:
+lit@3.3.1:
   version "3.3.1"
   resolved "https://registry.yarnpkg.com/lit/-/lit-3.3.1.tgz#9dc79be626bc9a3b824de98b107dd662cabdeda6"
   integrity sha512-Ksr/8L3PTapbdXJCk+EJVB78jDodUMaP54gD24W186zGRARvwrsPfS60wae/SSCTCNZVPd1chXqio1qHQmu4NA==
@@ -2062,7 +2062,7 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier@^3.0.3:
+prettier@3.6.2:
   version "3.6.2"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.6.2.tgz#ccda02a1003ebbb2bfda6f83a074978f608b9393"
   integrity sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==
