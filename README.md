@@ -85,6 +85,10 @@ The ⓘ button in the header opens **How this card works**: this scheduler's cur
 
 The chip in the header shows whether the scheduler's auto mode is on: blue with the hours per day when it is, grey "Auto off" when it isn't. Click it to turn auto mode on or off. The gear next to it opens a settings row with the same toggle and auto mode's hours per day, max price and cheap price. A price of 0 turns that limit off. Check **Hour range** to only pick hours between a start and an end time, for example 17:00 to 23:00; the chip then shows the range too. With the range on, **Cheap price all day** lets slots at or below the cheap price run outside it as well. Changes take effect at once. Check **Limit runs** to cap how many separate runs auto mode makes a day, for a target like a boiler that shouldn't start often; **Runs per day** at 1 runs the hours in one go, and the chip shows the limit. The hour range and the run limit each need a version of the integration that has them.
 
+### Stop sensor
+
+A red **Stopped** chip shows in the header while the scheduler's stop sensor is on. The stop sensor is a binary sensor, input boolean or switch picked under the integration's **Configure**, for example a Threshold helper that turns on once a bathroom passes 26 °C. While it is on the target is kept off, whatever auto mode, the default state or your overrides say, and the grid keeps showing what would run. The target turns off and back on as soon as the sensor changes, and auto mode doesn't make up the time lost. An unavailable stop sensor is ignored.
+
 ### Slots
 
 The border shows what the slot will actually do: a thick blue border means the entity runs.

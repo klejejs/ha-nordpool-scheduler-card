@@ -120,6 +120,12 @@ export function unpackSnapshot(
     vat_percent: published.vat_percent,
     now_slot_start: published.now_slot_start,
     target_state: published.target_state,
+    ...(published.stop_entity === undefined
+      ? {}
+      : {
+          stop_entity: published.stop_entity && mirroredId(published.stop_entity, prefix),
+          stopped: published.stopped,
+        }),
     auto: {
       ...auto,
       switch_entity: local(auto.switch_entity),

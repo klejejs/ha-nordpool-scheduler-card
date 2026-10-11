@@ -6,6 +6,7 @@ export const sharedStyles = css`
     --np-radius: 12px;
     --np-auto-color: var(--primary-color);
     --np-override-color: var(--accent-color, #ff9800);
+    --np-stop-color: var(--error-color, #db4437);
   }
 
   ha-card {
@@ -46,6 +47,18 @@ export const sharedStyles = css`
     background: var(--np-auto-color);
     border-color: var(--np-auto-color);
     color: var(--text-primary-color, #fff);
+  }
+
+  .stop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    background: var(--np-stop-color);
+    color: var(--text-primary-color, #fff);
+    font-size: 0.8em;
+    font-weight: 500;
   }
 
   .auto-chip:disabled {
@@ -511,6 +524,10 @@ export const sharedStyles = css`
     fill: var(--np-override-color);
   }
 
+  .info-icon.stop {
+    fill: var(--np-stop-color);
+  }
+
   .info-facts {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
@@ -580,7 +597,8 @@ export const sharedStyles = css`
     font-size: 1em;
   }
 
-  :host([density]) .auto-chip {
+  :host([density]) .auto-chip,
+  :host([density]) .stop-chip {
     padding: 2px 8px;
     font-size: 0.75em;
   }

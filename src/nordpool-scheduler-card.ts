@@ -38,7 +38,7 @@ import {
   setSlotsService,
   unpackSnapshot,
 } from './published';
-import { closeIcon, cogIcon, handIcon, infoIcon, robotIcon } from './icons';
+import { closeIcon, cogIcon, handIcon, infoIcon, robotIcon, stopIcon } from './icons';
 import { renderInfo } from './info';
 import { sharedStyles } from './styles';
 
@@ -529,6 +529,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     return html`<div class="card-header">
       ${showName ? html`<h2 class="card-title">${name}</h2>` : html`<span></span>`}
       <div class="header-actions">
+        ${!this._pricesOnly && this._data?.stopped
+          ? html`<span
+              class="stop-chip"
+              title="Held off by ${this._data.stop_entity}, whatever the slots say"
+              >${stopIcon('chip-icon')} Stopped</span
+            >`
+          : nothing}
         ${auto ? this._renderAutoControls(auto) : nothing}
         <button
           class="icon-button"

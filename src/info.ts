@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from 'lit';
 
 import type { NordpoolSchedulerCardConfig, ScheduleSnapshot } from './types';
 import { AVERAGE_LABELS, formatPrice } from './format';
-import { handIcon, robotIcon } from './icons';
+import { handIcon, robotIcon, stopIcon } from './icons';
 
 // Every user-facing feature of the card and the integration is explained here.
 // A change that adds or alters one updates this file in the same pull request.
@@ -81,9 +81,19 @@ function renderThisScheduler(
       ${hasRunLimit
         ? fact('Run limit', auto.runs_limited ? `On, ${auto.max_runs ?? 1} per day` : 'Off')
         : nothing}
+      ${data.stop_entity === undefined ? nothing : fact('Stop sensor', stopSensor(data))}
       ${fact('VAT', vat)} ${mirrored ? fact('Runs on', 'Another Home Assistant instance') : nothing}
     </dl>
   </section>`;
+}
+
+function stopSensor(data: ScheduleSnapshot): string {
+  if (!data.stop_entity) {
+    return 'None';
+  }
+  return data.stopped
+    ? `${data.stop_entity}, on now: the target is held off`
+    : `${data.stop_entity}, off`;
 }
 
 function renderScheduling(): TemplateResult {
@@ -100,6 +110,9 @@ function renderScheduling(): TemplateResult {
         </li>
         <li><strong>The default state</strong> (on or off) set in the integration.</li>
       </ol>
+      <p>
+        A <strong>stop sensor</strong>, while it is on, beats all three and keeps the target off.
+      </p>
       <p>
         At 00, 15, 30 and 45 past each hour the scheduler turns the target on or off to match the
         current slot. Changing an override, auto mode or one of its settings re-checks the current
@@ -243,6 +256,43 @@ function renderScheduling(): TemplateResult {
         between 17:00 and 23:00 with no slot above 15 c/kWh. A 3 c/kWh slot then only runs if it
         joins onto that run.
       </p>
+      <p>
+        Add a stop sensor that turns on when the bathroom passes 26 °C. If that happens at 18:30
+        during the run, the target goes off at once and stays off, your 12:00 override included,
+        until the bathroom cools and the sensor turns off. The time lost isn't made up later.
+      </p>
+    </section>
+
+    <section>
+      <h3>Stop sensor</h3>
+      <p>
+        Under the integration's <strong>Configure</strong> you can pick a
+        <strong>Stop sensor</strong>: a binary sensor, input boolean or switch. While it is on, the
+        target is kept off whatever the slot says, so floor heating stops once the room is warm
+        enough however cheap the price. The scheduler doesn't read temperatures itself: a Threshold
+        helper on a temperature sensor makes a good stop sensor.
+      </p>
+      <ul>
+        <li>
+          ${stopIcon('info-icon stop')} A red <strong>Stopped</strong> chip in the header shows
+          while it is on.
+        </li>
+        <li>
+          It wins over auto mode's picks, the default state and your overrides. The grid keeps
+          showing what would run.
+        </li>
+        <li>
+          The target turns off as soon as it turns on, and the current slot applies again as soon as
+          it turns off, without waiting for the next quarter hour.
+        </li>
+        <li>Auto mode doesn't pick extra slots to make up for the time it was stopped.</li>
+        <li>While it is unavailable it is ignored, and the schedule carries on.</li>
+        <li>
+          With <strong>Only act when the schedule changes</strong>, the target is switched once when
+          the stop starts and once when it ends, so a manual toggle in between is left alone. With
+          <strong>Enforce every 15 minutes</strong>, it is turned off again at every slot.
+        </li>
+      </ul>
     </section>
 
     <section>
