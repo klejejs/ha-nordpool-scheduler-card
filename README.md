@@ -112,7 +112,7 @@ The border shows what the slot will actually do: a thick blue border means the e
 - An orange hand in the top-right corner and a dashed border mark your own override. An override that runs the entity has an orange border.
 - A faded robot next to the hand is an auto pick you overrode off.
 
-Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
+Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again. An override is also removed once auto mode or the default state wants the same thing for that slot, for example after new prices or a change to auto mode's settings, so the grid only marks overrides that still change something.
 
 The info bar counts the upcoming auto picks and your overrides while auto mode is on, and your overrides alone while it is off.
 

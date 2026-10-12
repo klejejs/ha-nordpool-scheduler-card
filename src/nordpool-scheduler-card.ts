@@ -302,8 +302,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         this._pendingRequestId.delete(start);
         continue;
       }
+      // The integration drops an override that matches what the slot does anyway.
       const confirmed =
-        requested === 'default' ? slot.override === null : slot.override === requested;
+        requested === 'default'
+          ? slot.override === null
+          : slot.override === requested || (slot.override === null && slot.base === requested);
       if (confirmed) {
         this._pending.delete(start);
         this._pendingRequestId.delete(start);

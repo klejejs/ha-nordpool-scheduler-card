@@ -200,6 +200,11 @@ function renderScheduling(windows: boolean): TemplateResult {
         Overriding the current slot switches the target at once, even if you toggled the target by
         hand. Overrides survive restarts, and are removed once their slot has passed.
       </p>
+      <p>
+        An override is also removed as soon as auto mode or the default state wants the same thing
+        for its slot, for example after new prices, a change to auto mode's settings, or turning
+        auto mode on or off. It doesn't come back if auto mode later changes back.
+      </p>
     </section>
 
     ${windows ? renderAutoWindows() : renderDailyAuto()}
@@ -391,7 +396,8 @@ function renderAutoWindows(): TemplateResult {
         </li>
         <li>
           Your overrides go on top: click a 12:00 slot to run it anyway, or a picked 20:00 slot to
-          skip it.
+          skip it. If a later change makes auto mode pick 12:00 or drop 20:00 by itself, the
+          override is no longer needed and is removed.
         </li>
       </ol>
       <p>
@@ -546,7 +552,8 @@ function renderDailyAuto(): TemplateResult {
         </li>
         <li>
           Your overrides go on top: click a 12:00 slot to run it anyway, or a picked 18:00 slot to
-          skip it.
+          skip it. If a later change makes auto mode pick 12:00 or drop 18:00 by itself, the
+          override is no longer needed and is removed.
         </li>
       </ol>
       <p>
