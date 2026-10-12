@@ -95,6 +95,8 @@ export interface AutoWindow {
   hours: number;
   max_price: number;
   cheap_price: number;
+  /** The shortest run it starts, in hours. Missing when the integration predates it. */
+  min_run_hours?: number;
 }
 
 /** Auto mode's state and settings, and the entities that hold them. */
