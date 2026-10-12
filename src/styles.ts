@@ -5,7 +5,8 @@ export const sharedStyles = css`
     --np-spacing: 8px;
     --np-radius: 12px;
     --np-auto-color: var(--primary-color);
-    --np-override-color: var(--accent-color, #ff9800);
+    /* Not the accent colour: users can pick that in their profile, often a blue like the primary. */
+    --np-override-color: var(--orange-color, #ff9800);
     --np-stop-color: var(--error-color, #db4437);
   }
 
