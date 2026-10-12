@@ -991,6 +991,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       <span class="legend-item">${robotIcon('legend-icon auto')} Auto pick</span>
       <span class="legend-item">${handIcon('legend-icon manual')} Your override</span>
       <span class="legend-item"><span class="legend-swatch"></span> Runs</span>
+      <span class="legend-item"><span class="legend-swatch now"></span> Now</span>
     </div>`;
   }
 

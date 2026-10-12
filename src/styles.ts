@@ -384,7 +384,13 @@ export const sharedStyles = css`
   }
 
   .time-slot.current {
-    box-shadow: 0 0 0 2px var(--primary-color) inset;
+    outline: 2px solid var(--primary-text-color);
+    outline-offset: 1px;
+  }
+
+  .time-slot.current .time-label {
+    color: var(--primary-text-color);
+    font-weight: 600;
   }
 
   .time-slot.past {
@@ -474,6 +480,13 @@ export const sharedStyles = css`
     border-radius: 3px;
     border: 3px solid var(--primary-color);
     box-sizing: border-box;
+  }
+
+  .legend-swatch.now {
+    border: 1px solid var(--divider-color);
+    outline: 2px solid var(--primary-text-color);
+    outline-offset: 1px;
+    margin: 0 3px;
   }
 
   .placeholder-message {
@@ -711,6 +724,10 @@ export const sharedStyles = css`
 
   :host([density]) .time-slot.on {
     border-width: 2px;
+  }
+
+  :host([density]) .time-slot.current {
+    outline-offset: 0;
   }
 
   :host([density]) .slot-marker {

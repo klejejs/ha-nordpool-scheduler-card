@@ -184,8 +184,13 @@ function renderScheduling(windows: boolean): TemplateResult {
         </li>
         <li>A faded robot next to the hand is an auto pick you overrode off.</li>
         <li>
-          The current slot has an inner ring. Past slots are faded and can't be clicked. Tomorrow
-          shows a placeholder until Nord Pool publishes its prices, usually early afternoon CET.
+          <span class="legend-swatch now"></span> The current slot has a dark ring around it and a
+          bold time. The ring sits outside the border, so its border still says whether it runs and
+          whether that is auto mode's pick or your override.
+        </li>
+        <li>
+          Past slots are faded and can't be clicked. Tomorrow shows a placeholder until Nord Pool
+          publishes its prices, usually early afternoon CET.
         </li>
       </ul>
     </section>
