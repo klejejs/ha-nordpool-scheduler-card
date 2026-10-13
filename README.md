@@ -111,6 +111,7 @@ The border shows what the slot will actually do: a thick blue border means the e
 - A robot in the top-left corner marks a slot auto mode picked. It is only shown while auto mode is on.
 - An orange hand in the top-right corner and a dashed border mark your own override. An override that runs the entity has an orange border.
 - A faded robot next to the hand is an auto pick you overrode off.
+- The current slot has a ring in the text colour around it and a bold time. The ring sits outside the border, so the border still says whether it runs and why.
 
 Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
 

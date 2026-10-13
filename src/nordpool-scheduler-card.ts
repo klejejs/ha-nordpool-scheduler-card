@@ -611,7 +611,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         ${this._renderAverages()} ${this._showHistory ? this._renderHistoryBar() : nothing}
         ${showTabs ? this._renderDayTabs(dateKeys) : nothing}
         ${visibleDates.map((dateKey) => this._renderDaySection(dateKey, showTabs))}
-        ${this._data.auto.enabled && !this._pricesOnly ? this._renderLegend() : nothing}
+        ${this._pricesOnly ? nothing : this._renderLegend(this._data.auto.enabled)}
         ${this._renderInfoDialog()}
       </ha-card>
     `;
@@ -986,11 +986,14 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     </div>`;
   }
 
-  private _renderLegend(): TemplateResult {
+  private _renderLegend(autoEnabled: boolean): TemplateResult {
     return html`<div class="legend">
-      <span class="legend-item">${robotIcon('legend-icon auto')} Auto pick</span>
+      ${autoEnabled
+        ? html`<span class="legend-item">${robotIcon('legend-icon auto')} Auto pick</span>`
+        : nothing}
       <span class="legend-item">${handIcon('legend-icon manual')} Your override</span>
       <span class="legend-item"><span class="legend-swatch"></span> Runs</span>
+      <span class="legend-item"><span class="legend-swatch now"></span> Now</span>
     </div>`;
   }
 
