@@ -184,8 +184,8 @@ function renderScheduling(windows: boolean): TemplateResult {
         </li>
         <li>A faded robot next to the hand is an auto pick you overrode off.</li>
         <li>
-          <span class="legend-swatch now"></span> The current slot has a dark ring around it and a
-          bold time. The ring sits outside the border, so its border still says whether it runs and
+          <span class="legend-swatch now"></span> The current slot has a ring in the text colour
+          around it and a bold time. The ring sits outside the border, so its border still says whether it runs and
           whether that is auto mode's pick or your override.
         </li>
         <li>
