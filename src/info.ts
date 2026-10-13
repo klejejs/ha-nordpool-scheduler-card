@@ -418,7 +418,8 @@ function renderAutoWindows(): TemplateResult {
       <h3>What isn't allowed</h3>
       <p>
         Settings that contradict each other are refused, here and in the integration, with an error
-        that names the problem. Nothing is changed until they're fixed.
+        that names the problem. A window change that breaks a rule is kept in the settings unsaved,
+        with what is wrong, until you fix it or discard it.
       </p>
       <ul>
         <li>No windows at all. To stop auto mode, turn it off.</li>
@@ -438,18 +439,18 @@ function renderAutoWindows(): TemplateResult {
           day.
         </li>
         <li>
-          More hours than the windows cover between them: 06:00 to 08:00 for 2 h and 06:00 to 09:00
-          for 2 h need 4 hours of a 3-hour stretch.
+          A window that may not get its hours. Narrower windows pick first and can take any of
+          their slots: 06:00 to 08:00 for 2 h leaves 06:00 to 09:00 only 1 hour.
         </li>
         <li>
           With Limit runs on, fewer runs per day than windows that run for some time, since each
           needs a run. A window with only a cheap price needs none.
         </li>
-        <li>Runs per day that isn't a whole number.</li>
+        <li>Runs per day that isn't a whole number from 1 to 24.</li>
       </ul>
       <p>
         Windows saved before these rules that break one still run as they are. The settings show
-        what is wrong, and the next change to the windows has to fix it. A window can't be removed
+        what is wrong, and changes are kept unsaved until they fix it. A window can't be removed
         when it is the last one.
       </p>
     </section>

@@ -66,6 +66,7 @@ export class NordpoolSchedulerCardEditor extends LitElement {
         this._unsubscribeTarget();
       }
       this._targetEntity = published.target_entity;
+      this._dropInapplicable();
       return;
     }
     if (entityId !== this._subscribedEntity) {

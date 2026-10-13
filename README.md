@@ -101,7 +101,7 @@ Auto mode runs the target in a list of **time windows**. Outside every window th
 
 Click **Add window** to add one, and the bin to remove one. The last window can't be removed: turn auto mode off instead. The narrowest window picks first. With **Limit runs** on, each window runs its hours back to back and gets at least one run, and the day makes at most **Runs per day** runs, so three windows and 3 runs per day give, for example, one morning run, one evening run and one run wherever it's cheapest. **Min run** works with or without **Limit runs**: each run is at least that long, and cheap slots on their own only run in a stretch that long. The chip shows the hours of all the windows added up, a lone window's times or how many windows there are, and the run limit.
 
-Settings that contradict each other are refused before anything is sent, with an error naming the problem, and the integration checks the same rules:
+Settings that contradict each other are never sent: a window change that breaks a rule stays in the settings unsaved, listing what is wrong, until you fix it or discard it. The integration checks the same rules:
 
 - From and To fall on :00, :15, :30 or :45. To may also be 23:59.
 - Run for and Min run are whole quarter hours and fit in the time the window covers. 22:00 to 06:00 covers 8 hours.
@@ -109,10 +109,10 @@ Settings that contradict each other are refused before anything is sent, with an
 - Cheap price is no higher than Max price when both are set.
 - A window runs for some time, has a cheap price, or both.
 - No two windows cover the same time. From equal to To and 00:00 to 23:59 are both the whole day.
-- The windows' hours fit in the time they cover between them: 06:00 to 08:00 for 2 h and 06:00 to 09:00 for 2 h need 4 hours of a 3-hour stretch.
-- With **Limit runs** on, **Runs per day** is a whole number and at least the number of windows that run for some time. A window with only a cheap price needs no run.
+- Every window is sure of its hours. Narrower windows pick first and can take any of their slots, so 06:00 to 08:00 for 2 h leaves 06:00 to 09:00 only 1 hour.
+- With **Limit runs** on, **Runs per day** is a whole number from 1 to 24 and at least the number of windows that run for some time. A window with only a cheap price needs no run.
 
-Windows saved before these rules that break one keep running, and the settings list what is wrong until the next change fixes it.
+Windows saved before these rules that break one keep running, and the settings list what is wrong; changes stay unsaved until they fix it.
 
 The ⓘ dialog explains the rules in full with worked examples. The time windows need a version of the integration that has them; with an older one the gear shows its hours per day, prices, hour range and run limit instead.
 

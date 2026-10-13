@@ -115,6 +115,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   /** The windows last sent to set_auto_windows, until a snapshot carries them. */
   @state() private _pendingWindows?: AutoWindow[];
 
+  /** Window edits that break a rule, kept here unsent until they're fixed or discarded. */
+  @state() private _draftWindows?: AutoWindow[];
+
   /** Whether the config sets show_history itself, rather than taking the default. */
   private _historySet = false;
 
@@ -288,6 +291,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     this._error = undefined;
     const entityId = this._config!.entity!;
     this._subscribedEntity = entityId;
+    this._draftWindows = undefined;
     const subscriptionId = ++this._subscriptionId;
     this.hass!.connection.subscribeMessage<ScheduleSnapshot>(
       (data) => this._onSnapshot(subscriptionId, data),
@@ -513,6 +517,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   /** The windows to show and edit: the ones being saved, or else the snapshot's. */
   private get _windows(): AutoWindow[] | undefined {
+    return this._draftWindows ?? this._savedWindows;
+  }
+
+  /** The windows the integration has, or is being sent. */
+  private get _savedWindows(): AutoWindow[] | undefined {
     return this._pendingWindows ?? this._data?.auto.windows;
   }
 
@@ -521,12 +530,12 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       return;
     }
     const { runs_limited: runsLimited, max_runs: maxRuns } = this._data.auto;
-    const errors = windowErrors(windows, runsLimited ?? false, maxRuns ?? 1);
-    if (errors.length > 0) {
-      revert?.();
-      this._actionError = `Could not ${failed}: ${errors.join('; ')}`;
+    if (windowErrors(windows, runsLimited ?? false, maxRuns ?? 1).length > 0) {
+      // Kept as a draft, so a window with two wrong fields can be fixed one at a time.
+      this._draftWindows = windows;
       return;
     }
+    this._draftWindows = undefined;
     // Sorted as the integration stores them, so the snapshot that confirms them compares equal.
     const sorted = [...windows].sort(
       (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)
@@ -842,11 +851,21 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         >
       </div>
       ${problems.length > 0
-        ? html`<ha-alert alert-type="warning" title="These windows break a rule">
-            Auto mode still runs them as they are, but the next change has to fix this:
+        ? html`<ha-alert
+            alert-type="warning"
+            title=${this._draftWindows ? 'Not saved yet' : 'These windows break a rule'}
+          >
+            ${this._draftWindows
+              ? 'Your changes are kept here until they follow every rule, and then saved:'
+              : 'Auto mode still runs them as they are, but the next change has to fix this:'}
             <ul>
               ${problems.map((problem) => html`<li>${problem}</li>`)}
             </ul>
+            ${this._draftWindows
+              ? html`<button class="text-button" @click=${() => (this._draftWindows = undefined)}>
+                  Discard changes
+                </button>`
+              : nothing}
           </ha-alert>`
         : nothing}
       ${windows.map((window, index) => this._renderWindow(window, index, disabled))}
@@ -963,7 +982,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           @change=${(ev: Event) => {
             const checkbox = ev.target as HTMLInputElement;
             const errors = checkbox.checked
-              ? runLimitErrors(this._windows ?? [], true, auto.max_runs ?? 1)
+              ? runLimitErrors(this._savedWindows ?? [], true, auto.max_runs ?? 1)
               : [];
             if (errors.length > 0) {
               checkbox.checked = false;
@@ -989,7 +1008,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
                 const input = ev.target as HTMLInputElement;
                 const errors = Number.isNaN(input.valueAsNumber)
                   ? []
-                  : runLimitErrors(this._windows ?? [], true, input.valueAsNumber);
+                  : runLimitErrors(this._savedWindows ?? [], true, input.valueAsNumber);
                 if (Number.isNaN(input.valueAsNumber) || errors.length > 0) {
                   input.value = String(auto.max_runs ?? 1);
                   if (errors.length > 0) {

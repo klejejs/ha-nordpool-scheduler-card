@@ -43,7 +43,7 @@ export function configErrors(config: Record<string, unknown> | undefined): strin
       });
     }
   }
-  if (service !== undefined && (typeof service !== 'string' || !/^\w+\.\w+$/.test(service))) {
+  if (service !== undefined && (typeof service !== 'string' || !/^[a-z0-9_]+\.[a-z0-9_]+$/.test(service))) {
     errors.push(
       `set_slots_service must be an action like domain.service, not ${JSON.stringify(service)}`
     );
@@ -80,7 +80,8 @@ function label(window: AutoWindow): string {
 
 function onBoundary(at: string, end: boolean): boolean {
   return (
-    /^\d\d:\d\d$/.test(at) && (minutes(at) % SLOT_MINUTES === 0 || (end && at === WHOLE_DAY_END))
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(at) &&
+    (minutes(at) % SLOT_MINUTES === 0 || (end && at === WHOLE_DAY_END))
   );
 }
 
@@ -139,35 +140,27 @@ function ownErrors(window: AutoWindow, cover: number[]): string[] {
   return errors;
 }
 
-/** The windows whose hours add up to more than the slots they cover together, if any. */
+/**
+ * A window that may not get its hours, and the windows that pick before it, if any.
+ * Windows pick narrowest first and may take any slot they cover, as auto mode does.
+ */
 function unfittable(windows: AutoWindow[], covers: number[][]): AutoWindow[] {
   // A negative or missing Run for is its own error, and needs no slots here.
-  const needs = windows.flatMap((window, i) =>
-    Array<number>(Math.max(0, slotsOf(window.hours) || 0)).fill(i)
-  );
-  const holder = new Map<number, number>();
-  const place = (need: number, seen: Set<number>): boolean => {
-    for (const slot of covers[needs[need]]) {
-      if (seen.has(slot)) {
-        continue;
-      }
-      seen.add(slot);
-      const held = holder.get(slot);
-      if (held === undefined || place(held, seen)) {
-        holder.set(slot, need);
-        return true;
-      }
-    }
-    return false;
-  };
-  for (let need = 0; need < needs.length; need++) {
-    const seen = new Set<number>();
-    if (!place(need, seen)) {
-      const competing = new Set([
-        needs[need],
-        ...[...seen].map((slot) => needs[holder.get(slot)!]),
-      ]);
-      return [...competing].sort((a, b) => a - b).map((i) => windows[i]);
+  const needs = windows.map((window) => Math.max(0, slotsOf(window.hours) || 0));
+  const order = windows
+    .map((_, i) => i)
+    .filter((i) => needs[i] > 0)
+    .sort(
+      (a, b) =>
+        covers[a].length - covers[b].length || minutes(windows[a].start) - minutes(windows[b].start)
+    );
+  for (const [position, i] of order.entries()) {
+    const own = new Set(covers[i]);
+    const shared = (j: number) => covers[j].filter((slot) => own.has(slot)).length;
+    const earlier = order.slice(0, position).filter((j) => shared(j) > 0);
+    const taken = earlier.reduce((sum, j) => sum + Math.min(needs[j], shared(j)), 0);
+    if (needs[i] > covers[i].length - taken) {
+      return [...earlier, i].sort((a, b) => a - b).map((j) => windows[j]);
     }
   }
   return [];
@@ -180,8 +173,8 @@ export function runLimitErrors(
   maxRuns: number
 ): string[] {
   const errors: string[] = [];
-  if (!Number.isInteger(maxRuns)) {
-    errors.push(`Runs per day must be a whole number, not ${maxRuns}`);
+  if (!Number.isInteger(maxRuns) || maxRuns < 1 || maxRuns > 24) {
+    errors.push(`Runs per day must be a whole number from 1 to 24, not ${maxRuns}`);
   }
   const running = windows.filter((window) => slotsOf(window.hours) > 0).length;
   if (runsLimited && running > maxRuns) {
@@ -215,7 +208,7 @@ export function windowErrors(
     const unfit = unfittable(windows, covers);
     if (unfit.length > 0) {
       errors.push(
-        `Windows ${unfit.map(label).join(', ')} run for more hours than they cover between them`
+        `Windows ${unfit.map(label).join(', ')} can't all be sure of their hours: narrower windows pick first and can take the time the wider ones need`
       );
     }
   }
