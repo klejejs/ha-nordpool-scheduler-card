@@ -114,7 +114,7 @@ The border shows what the slot will actually do: a thick blue border means the e
 - A faded robot next to the hand is an auto pick you overrode off.
 - The current slot has a ring in the text colour around it and a bold time. The ring sits outside the border, so the border still says whether it runs and why.
 
-Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again.
+Click a slot to override it to the opposite of what auto mode or the default state wants. Click an overridden slot to remove the override, and the slot follows auto mode or the default again. An override is also removed once auto mode or the default state wants the same thing for that slot, for example after new prices or a change to auto mode's settings, so the grid only marks overrides that still change something.
 
 The info bar counts the upcoming auto picks and your overrides while auto mode is on, and your overrides alone while it is off.
 
