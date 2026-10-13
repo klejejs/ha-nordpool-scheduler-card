@@ -59,6 +59,8 @@ hide_averages: [] # e.g. [week, year]
 | `hide_averages` | list | none | Average prices to leave out of the row: `today`, `week`, `month`, `year`. Listing all four hides the row |
 | `set_slots_service` | string | see below | For a mirrored scheduler only: the Remote Home-Assistant proxy service that sets slots |
 
+An option of the wrong type or with an unknown value, such as `density: tiny`, a repeated entry in `hide_averages` or a `set_slots_service` that isn't `domain.service`, shows an error in place of the card. So does `set_slots_service` on a scheduler that isn't mirrored, or `show_history` on a prices-only entry, which has no target. The card editor removes those two when they stop applying.
+
 ### On another instance
 
 The card can show a scheduler that runs on another Home Assistant instance and is mirrored into this one with [Remote Home-Assistant](https://github.com/custom-components/remote_homeassistant). Set up the other instance as the [integration's README](https://github.com/klejejs/ha-nordpool-scheduler-integration#another-home-assistant-instance) describes, then point the card at the mirrored Schedule sensor:
@@ -93,11 +95,24 @@ Auto mode runs the target in a list of **time windows**. Outside every window th
 |---|---|
 | **Auto mode**, on or off | **From** and **To**, the time of day it covers. A To before From wraps past midnight, and 00:00 to 23:59 is the whole day. |
 | **Limit runs**, on or off | **Run for**, the hours it runs in its cheapest slots |
-| **Runs per day** | **Max price**: the slots it picks for its hours are never above this. With **Limit runs** off, a cheap price set above it still runs those cheap slots. 0 turns it off. |
-| | **Cheap price**: its slots at or below this run too. 0 turns it off. |
-| | **Min run**: once it turns the target on, it stays on at least this long, so a boiler never runs for a lone 15 minutes. A shorter Run for is raised to it. 0 turns it off. Shown when the integration has it. |
+| **Runs per day** | **Max price**: the slots it picks for its hours are never above this. 0 turns it off. |
+| | **Cheap price**: its slots at or below this run too, so it can't be above the max price. 0 turns it off. |
+| | **Min run**: once it turns the target on, it stays on at least this long, so a boiler never runs for a lone 15 minutes. It can't be longer than Run for, unless Run for is 0. 0 turns it off. Shown when the integration has it. |
 
-Click **Add window** to add one, and the bin to remove one. The narrowest window picks first. With **Limit runs** on, each window runs its hours back to back and gets at least one run, and the day makes at most **Runs per day** runs, so three windows and 3 runs per day give, for example, one morning run, one evening run and one run wherever it's cheapest. **Min run** works with or without **Limit runs**: each run is at least that long, and cheap slots on their own only run in a stretch that long. The chip shows the hours of all the windows added up, a lone window's times or how many windows there are, and the run limit.
+Click **Add window** to add one, and the bin to remove one. The last window can't be removed: turn auto mode off instead. The narrowest window picks first. With **Limit runs** on, each window runs its hours back to back and gets at least one run, and the day makes at most **Runs per day** runs, so three windows and 3 runs per day give, for example, one morning run, one evening run and one run wherever it's cheapest. **Min run** works with or without **Limit runs**: each run is at least that long, and cheap slots on their own only run in a stretch that long. The chip shows the hours of all the windows added up, a lone window's times or how many windows there are, and the run limit.
+
+Settings that contradict each other are refused before anything is sent, with an error naming the problem, and the integration checks the same rules:
+
+- From and To fall on :00, :15, :30 or :45. To may also be 23:59.
+- Run for and Min run are whole quarter hours and fit in the time the window covers. 22:00 to 06:00 covers 8 hours.
+- Min run is no longer than Run for, unless Run for is 0.
+- Cheap price is no higher than Max price when both are set.
+- A window runs for some time, has a cheap price, or both.
+- No two windows cover the same time. From equal to To and 00:00 to 23:59 are both the whole day.
+- The windows' hours fit in the time they cover between them: 06:00 to 08:00 for 2 h and 06:00 to 09:00 for 2 h need 4 hours of a 3-hour stretch.
+- With **Limit runs** on, **Runs per day** is a whole number and at least the number of windows that run for some time. A window with only a cheap price needs no run.
+
+Windows saved before these rules that break one keep running, and the settings list what is wrong until the next change fixes it.
 
 The ⓘ dialog explains the rules in full with worked examples. The time windows need a version of the integration that has them; with an older one the gear shows its hours per day, prices, hour range and run limit instead.
 

@@ -71,6 +71,32 @@ export class NordpoolSchedulerCardEditor extends LitElement {
     if (entityId !== this._subscribedEntity) {
       this._subscribeTarget(entityId);
     }
+    this._dropInapplicable();
+  }
+
+  /** Remove options the chosen entity doesn't take, which the card would refuse. */
+  private _dropInapplicable(): void {
+    const config = this._config;
+    if (!config?.entity || !this.hass) {
+      return;
+    }
+    const drop: (keyof NordpoolSchedulerCardConfig)[] = [];
+    if (
+      config.set_slots_service !== undefined &&
+      this.hass.entities &&
+      !isMirrored(this.hass, config.entity)
+    ) {
+      drop.push('set_slots_service');
+    }
+    if (config.show_history !== undefined && this._targetEntity === null) {
+      drop.push('show_history');
+    }
+    if (drop.length > 0) {
+      const next = { ...config };
+      drop.forEach((key) => delete next[key]);
+      this._config = next;
+      this._fireConfigChanged(next);
+    }
   }
 
   private _subscribeTarget(entityId: string | undefined): void {
@@ -187,12 +213,12 @@ export class NordpoolSchedulerCardEditor extends LitElement {
 
   private _valueChanged(ev: CustomEvent<{ value: NordpoolSchedulerCardConfig }>): void {
     ev.stopPropagation();
+    this._fireConfigChanged(ev.detail.value);
+  }
+
+  private _fireConfigChanged(config: NordpoolSchedulerCardConfig): void {
     this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: ev.detail.value },
-        bubbles: true,
-        composed: true,
-      })
+      new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true })
     );
   }
 }

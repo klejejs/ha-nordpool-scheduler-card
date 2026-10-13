@@ -54,6 +54,7 @@ import {
 } from './icons';
 import { renderInfo } from './info';
 import { sharedStyles } from './styles';
+import { configErrors, runLimitErrors, windowErrors } from './validation';
 
 declare const __CARD_VERSION__: string;
 
@@ -114,6 +115,9 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   /** The windows last sent to set_auto_windows, until a snapshot carries them. */
   @state() private _pendingWindows?: AutoWindow[];
 
+  /** Whether the config sets show_history itself, rather than taking the default. */
+  private _historySet = false;
+
   @query('.info-dialog') private _infoDialog?: HTMLDialogElement;
 
   private _pending = new Map<string, SetSlotState>();
@@ -170,9 +174,11 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   public setConfig(config: NordpoolSchedulerCardConfig): void {
-    if (!config?.entity) {
-      throw new Error('Entity must be specified');
+    const errors = configErrors(config);
+    if (errors.length > 0) {
+      throw new Error(errors.join('. '));
     }
+    this._historySet = config.show_history !== undefined;
     this._config = { show_name: true, show_history: true, ...config };
     if (this._density === 'normal') {
       this.removeAttribute('density');
@@ -182,8 +188,19 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   }
 
   private get _density(): Density {
-    const density = this._config?.density;
-    return density === 'compact' || density === 'super_compact' ? density : 'normal';
+    return this._config?.density ?? 'normal';
+  }
+
+  /** What the card's options get wrong about this entity, which setConfig can't know. */
+  private get _configProblem(): string | undefined {
+    const { entity, set_slots_service: service } = this._config!;
+    if (service !== undefined && this.hass!.entities && !isMirrored(this.hass!, entity!)) {
+      return 'set_slots_service only applies to a scheduler mirrored from another instance';
+    }
+    if (this._historySet && this._pricesOnly) {
+      return "show_history doesn't apply to a prices-only entry, which has no target to show";
+    }
+    return undefined;
   }
 
   /** A prices entry has no target, so there is no schedule to show or change. */
@@ -503,6 +520,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (!this.hass || !this._data) {
       return;
     }
+    const { runs_limited: runsLimited, max_runs: maxRuns } = this._data.auto;
+    const errors = windowErrors(windows, runsLimited ?? false, maxRuns ?? 1);
+    if (errors.length > 0) {
+      revert?.();
+      this._actionError = `Could not ${failed}: ${errors.join('; ')}`;
+      return;
+    }
     // Sorted as the integration stores them, so the snapshot that confirms them compares equal.
     const sorted = [...windows].sort(
       (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)
@@ -535,7 +559,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
       // A cleared price or min run means no limit; cleared hours stay as they were.
       value = input.value === '' && field !== 'hours' ? 0 : input.valueAsNumber;
     }
-    if (value === '' || (typeof value === 'number' && (Number.isNaN(value) || value < 0))) {
+    if (value === '' || Number.isNaN(value)) {
       input.value = String(saved);
       return;
     }
@@ -584,6 +608,14 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         <ha-alert alert-type="error"
           >Could not load "${this._config.entity}": ${this._error}</ha-alert
         >
+        ${this._renderInfoDialog()}
+      </ha-card>`;
+    }
+    const problem = this._data ? this._configProblem : undefined;
+    if (problem) {
+      return html`<ha-card
+        >${this._renderHeader()}
+        <ha-alert alert-type="error">${problem}</ha-alert>
         ${this._renderInfoDialog()}
       </ha-card>`;
     }
@@ -800,6 +832,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   private _renderWindows(windows: AutoWindow[]): TemplateResult {
     const service = this._setWindowsService;
     const disabled = !hasService(this.hass!, service);
+    const { runs_limited: runsLimited, max_runs: maxRuns } = this._data!.auto;
+    const problems = windowErrors(windows, runsLimited ?? false, maxRuns ?? 1);
     return html`<div class="settings-windows">
       <div class="settings-windows-header">
         <span class="setting-label">Time windows</span>
@@ -807,8 +841,13 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           >Each runs for its hours in its cheapest slots. Outside them the target is off.</span
         >
       </div>
-      ${windows.length === 0
-        ? html`<span class="setting-hint">No windows, so auto mode runs nothing.</span>`
+      ${problems.length > 0
+        ? html`<ha-alert alert-type="warning" title="These windows break a rule">
+            Auto mode still runs them as they are, but the next change has to fix this:
+            <ul>
+              ${problems.map((problem) => html`<li>${problem}</li>`)}
+            </ul>
+          </ha-alert>`
         : nothing}
       ${windows.map((window, index) => this._renderWindow(window, index, disabled))}
       <button
@@ -898,8 +937,10 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           </label>`}
       <button
         class="icon-button settings-window-remove"
-        title="Remove this window"
-        ?disabled=${disabled}
+        title=${windows.length === 1
+          ? 'Auto mode needs a window. Turn auto mode off to stop it'
+          : 'Remove this window'}
+        ?disabled=${disabled || windows.length === 1}
         @click=${() =>
           this._setWindows(
             windows.filter((_, i) => i !== index),
@@ -919,13 +960,18 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           type="checkbox"
           .checked=${auto.runs_limited ?? false}
           ?disabled=${!auto.runs_limited_entity}
-          @change=${(ev: Event) =>
-            this._toggleSwitch(
-              auto.runs_limited_entity,
-              'runs_limited',
-              'run limit',
-              ev.target as HTMLInputElement
-            )}
+          @change=${(ev: Event) => {
+            const checkbox = ev.target as HTMLInputElement;
+            const errors = checkbox.checked
+              ? runLimitErrors(this._windows ?? [], true, auto.max_runs ?? 1)
+              : [];
+            if (errors.length > 0) {
+              checkbox.checked = false;
+              this._actionError = `Could not turn the run limit on: ${errors.join('; ')}`;
+              return;
+            }
+            this._toggleSwitch(auto.runs_limited_entity, 'runs_limited', 'run limit', checkbox);
+          }}
         />
         <span class="setting-hint">Fewer on/off cycles, e.g. for a boiler</span>
       </label>
@@ -941,9 +987,14 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
               ?disabled=${!auto.max_runs_entity}
               @change=${(ev: Event) => {
                 const input = ev.target as HTMLInputElement;
-                // step="1" doesn't stop a typed 1.5, which the integration would round down.
-                if (!Number.isInteger(input.valueAsNumber)) {
+                const errors = Number.isNaN(input.valueAsNumber)
+                  ? []
+                  : runLimitErrors(this._windows ?? [], true, input.valueAsNumber);
+                if (Number.isNaN(input.valueAsNumber) || errors.length > 0) {
                   input.value = String(auto.max_runs ?? 1);
+                  if (errors.length > 0) {
+                    this._actionError = `Could not set runs per day: ${errors.join('; ')}`;
+                  }
                   return;
                 }
                 this._setAutoSetting(auto.max_runs_entity ?? null, 'max_runs', 'runs per day', ev);

@@ -340,10 +340,6 @@ function renderAutoWindows(): TemplateResult {
           never picks a slot above its max price for its hours.
         </li>
         <li>
-          A cheap price set above the max price still runs those cheap slots while Limit runs is
-          off. With Limit runs on, cheap slots stay at or below the max price too.
-        </li>
-        <li>
           A window that runs for 0 hours picks nothing, but its cheap price still applies. A
           whole-day window with 0 hours and a cheap price runs every cheap slot of the day.
         </li>
@@ -366,10 +362,6 @@ function renderAutoWindows(): TemplateResult {
         <li>
           Every window that runs for some time gets at least one run. Narrower windows go first, and
           a window only takes more than one run when enough are left for the windows after it.
-        </li>
-        <li>
-          With more such windows than runs per day, each window still gets its one run, so the day
-          runs more often than the limit.
         </li>
         <li>
           Slots that join onto a run another window already made lengthen that run, and don't count
@@ -400,10 +392,6 @@ function renderAutoWindows(): TemplateResult {
           run 1 h that is one 2-hour run or two runs of at least an hour, never scattered slots.
         </li>
         <li>
-          A window that runs for less than its min run runs for the min run: Run for 30 min with Min
-          run 1 h runs a whole hour. A window shorter than its min run runs its whole length.
-        </li>
-        <li>
           A run never spans a slot above the max price, so when no stretch under it is long enough
           the window runs for less than its hours, or not at all.
         </li>
@@ -424,6 +412,46 @@ function renderAutoWindows(): TemplateResult {
           sensor still cuts a run short.
         </li>
       </ul>
+    </section>
+
+    <section>
+      <h3>What isn't allowed</h3>
+      <p>
+        Settings that contradict each other are refused, here and in the integration, with an error
+        that names the problem. Nothing is changed until they're fixed.
+      </p>
+      <ul>
+        <li>No windows at all. To stop auto mode, turn it off.</li>
+        <li>
+          From or To off a quarter hour. They fall on :00, :15, :30 or :45, and To may also be
+          23:59.
+        </li>
+        <li>
+          Run for or Min run longer than the window covers, or not in whole quarter hours. 22:00 to
+          06:00 covers 8 hours.
+        </li>
+        <li>A min run longer than Run for, unless Run for is 0.</li>
+        <li>A cheap price above the max price, when both are set.</li>
+        <li>A window with 0 hours and no cheap price, which never runs anything.</li>
+        <li>
+          Two windows over the same time. From equal to To and 00:00 to 23:59 are both the whole
+          day.
+        </li>
+        <li>
+          More hours than the windows cover between them: 06:00 to 08:00 for 2 h and 06:00 to 09:00
+          for 2 h need 4 hours of a 3-hour stretch.
+        </li>
+        <li>
+          With Limit runs on, fewer runs per day than windows that run for some time, since each
+          needs a run. A window with only a cheap price needs none.
+        </li>
+        <li>Runs per day that isn't a whole number.</li>
+      </ul>
+      <p>
+        Windows saved before these rules that break one still run as they are. The settings show
+        what is wrong, and the next change to the windows has to fix it. A window can't be removed
+        when it is the last one.
+      </p>
     </section>
 
     <section>
@@ -458,9 +486,9 @@ function renderAutoWindows(): TemplateResult {
           override is no longer needed and is removed.
         </li>
         <li>
-          Give the whole-day window a min run of 1 h and it runs a whole hour instead of 15
-          minutes: its cheapest unbroken hour at no more than 15 c/kWh, or slots that lengthen the
-          morning or evening run when those are cheaper.
+          Give the whole-day window Run for 1 h and a min run of 1 h and it runs a whole hour in one
+          go rather than four scattered slots: its cheapest unbroken hour at no more than 15 c/kWh,
+          or slots that lengthen the morning or evening run when those are cheaper.
         </li>
       </ol>
       <p>
@@ -700,7 +728,10 @@ function renderCardOptions(
   const hidden = config.hide_averages ?? [];
   return html`<section>
     <h3>Card options</h3>
-    <p>Set in the card editor. They only change how this card looks.</p>
+    <p>
+      Set in the card editor. They only change how this card looks. An option the card doesn't
+      accept, such as an unknown density, shows an error in place of the card.
+    </p>
     <ul>
       <li>
         <strong>Density</strong>: Compact makes slots short, Super compact also fits eight slots per
