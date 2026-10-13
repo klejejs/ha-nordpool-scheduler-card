@@ -78,6 +78,22 @@ const NEW_WINDOW: AutoWindow = {
   cheap_price: 0,
 };
 
+/** A new window, with a Min run when the integration's windows have one. */
+function newWindow(windows: AutoWindow[]): AutoWindow {
+  return windows.some((window) => window.min_run_hours !== undefined)
+    ? { ...NEW_WINDOW, min_run_hours: 0 }
+    : NEW_WINDOW;
+}
+
+/** Whether the snapshot carries the windows sent, a min run left out counting as 0. */
+function sameWindows(snapshot: AutoWindow[] | undefined, sent: AutoWindow[]): boolean {
+  const key = (windows: AutoWindow[]) =>
+    JSON.stringify(
+      windows.map((window) => ({ ...window, min_run_hours: window.min_run_hours ?? 0 }))
+    );
+  return snapshot !== undefined && key(snapshot) === key(sent);
+}
+
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
@@ -289,10 +305,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _applySnapshot(data: ScheduleSnapshot): void {
     this._data = data;
-    if (
-      this._pendingWindows &&
-      JSON.stringify(data.auto.windows) === JSON.stringify(this._pendingWindows)
-    ) {
+    if (this._pendingWindows && sameWindows(data.auto.windows, this._pendingWindows)) {
       this._pendingWindows = undefined;
     }
     for (const [start, requested] of this._pending) {
@@ -799,7 +812,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         class="text-button"
         ?disabled=${disabled}
         title=${disabled ? `${service} isn't available here` : 'Add a time window'}
-        @click=${() => this._setWindows([...windows, NEW_WINDOW], 'add a time window')}
+        @click=${() => this._setWindows([...windows, newWindow(windows)], 'add a time window')}
       >
         ${plusIcon('button-icon')} Add window
       </button>

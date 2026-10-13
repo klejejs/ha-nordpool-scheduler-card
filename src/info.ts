@@ -123,8 +123,12 @@ function describeWindow(window: AutoWindow, locale: string): string {
   if (window.cheap_price > 0) {
     parts.push(`cheap at ${formatPrice(window.cheap_price, locale)} or less`);
   }
-  if (window.min_run_hours) {
-    parts.push(`runs at least ${formatHours(window.min_run_hours, locale)} at a time`);
+  if (window.min_run_hours !== undefined) {
+    parts.push(
+      window.min_run_hours > 0
+        ? `runs at least ${formatHours(window.min_run_hours, locale)} at a time`
+        : 'no min run'
+    );
   }
   return parts.join(' · ');
 }
