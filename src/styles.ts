@@ -151,9 +151,14 @@ export const sharedStyles = css`
       grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
       align-items: end;
     }
+
+    .settings-window.with-min-run {
+      grid-template-columns: repeat(2, minmax(0, 1.5fr)) repeat(4, minmax(0, 1fr)) auto;
+    }
   }
 
   .settings-window-remove {
+    grid-column: -2;
     justify-self: end;
     align-self: end;
   }

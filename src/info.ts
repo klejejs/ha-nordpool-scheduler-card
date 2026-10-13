@@ -123,6 +123,13 @@ function describeWindow(window: AutoWindow, locale: string): string {
   if (window.cheap_price > 0) {
     parts.push(`cheap at ${formatPrice(window.cheap_price, locale)} or less`);
   }
+  if (window.min_run_hours !== undefined) {
+    parts.push(
+      window.min_run_hours > 0
+        ? `runs at least ${formatHours(window.min_run_hours, locale)} at a time`
+        : 'no min run'
+    );
+  }
   return parts.join(' · ');
 }
 
@@ -296,6 +303,10 @@ function renderAutoWindows(): TemplateResult {
           <strong>Cheap price</strong>: its slots at or below this price run too, even past its
           hours. 0 turns it off.
         </li>
+        <li>
+          <strong>Min run</strong>: once it turns the target on, it stays on at least this long. 0
+          turns it off. See Min run below.
+        </li>
       </ul>
       <p>
         A new scheduler has one window, 00:00 to 23:59 for 2 hours with no prices set: the target
@@ -365,6 +376,48 @@ function renderAutoWindows(): TemplateResult {
           own.
         </li>
         <li>A window that wraps past midnight is two stretches of the same day.</li>
+        <li>
+          Min run applies on top: every run is also at least its window's min run long. Two runs of
+          at least an hour can't fit 1.5 hours, so such a window makes one 1.5-hour run.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Min run</h3>
+      <p>
+        A window's <strong>Min run</strong> is the shortest run it starts, so a boiler never runs
+        for a lone 15 minutes. It works with Limit runs on or off.
+      </p>
+      <ul>
+        <li>
+          Its hours go to the cheapest stretches at least the min run long. With Run for 2 h and Min
+          run 1 h that is one 2-hour run or two runs of at least an hour, never scattered slots.
+        </li>
+        <li>
+          A window that runs for less than its min run runs for the min run: Run for 30 min with Min
+          run 1 h runs a whole hour. A window shorter than its min run runs its whole length.
+        </li>
+        <li>
+          A run never spans a slot above the max price, so when no stretch under it is long enough
+          the window runs for less than its hours, or not at all.
+        </li>
+        <li>
+          A slot that joins onto a run another window already made counts that run's length, so it
+          can lengthen the run by just 15 minutes.
+        </li>
+        <li>
+          A cheap slot always runs when it lengthens a run. Cheap slots on their own only run in a
+          stretch at least the min run long.
+        </li>
+        <li>
+          Each day is picked on its own, so a run at midnight must be long enough within its own
+          day.
+        </li>
+        <li>
+          It only shapes auto mode's picks. Your overrides still switch single slots, and a stop
+          sensor still cuts a run short.
+        </li>
       </ul>
     </section>
 
@@ -397,6 +450,11 @@ function renderAutoWindows(): TemplateResult {
         <li>
           Your overrides go on top: click a 12:00 slot to run it anyway, or a picked 20:00 slot to
           skip it.
+        </li>
+        <li>
+          Give the whole-day window a min run of 1 h and it runs a whole hour instead of 15
+          minutes: its cheapest unbroken hour at no more than 15 c/kWh, or slots that lengthen the
+          morning or evening run when those are cheaper.
         </li>
       </ol>
       <p>

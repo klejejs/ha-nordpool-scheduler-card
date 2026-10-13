@@ -78,6 +78,22 @@ const NEW_WINDOW: AutoWindow = {
   cheap_price: 0,
 };
 
+/** A new window, with a Min run when the integration's windows have one. */
+function newWindow(windows: AutoWindow[]): AutoWindow {
+  return windows.some((window) => window.min_run_hours !== undefined)
+    ? { ...NEW_WINDOW, min_run_hours: 0 }
+    : NEW_WINDOW;
+}
+
+/** Whether the snapshot carries the windows sent, a min run left out counting as 0. */
+function sameWindows(snapshot: AutoWindow[] | undefined, sent: AutoWindow[]): boolean {
+  const key = (windows: AutoWindow[]) =>
+    JSON.stringify(
+      windows.map((window) => ({ ...window, min_run_hours: window.min_run_hours ?? 0 }))
+    );
+  return snapshot !== undefined && key(snapshot) === key(sent);
+}
+
 export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
@@ -289,10 +305,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _applySnapshot(data: ScheduleSnapshot): void {
     this._data = data;
-    if (
-      this._pendingWindows &&
-      JSON.stringify(data.auto.windows) === JSON.stringify(this._pendingWindows)
-    ) {
+    if (this._pendingWindows && sameWindows(data.auto.windows, this._pendingWindows)) {
       this._pendingWindows = undefined;
     }
     for (const [start, requested] of this._pending) {
@@ -516,7 +529,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
     if (field === 'start' || field === 'end') {
       value = input.value.slice(0, 5);
     } else {
-      // A cleared price means no limit; cleared hours stay as they were.
+      // A cleared price or min run means no limit; cleared hours stay as they were.
       value = input.value === '' && field !== 'hours' ? 0 : input.valueAsNumber;
     }
     if (value === '' || (typeof value === 'number' && (Number.isNaN(value) || value < 0))) {
@@ -799,7 +812,7 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
         class="text-button"
         ?disabled=${disabled}
         title=${disabled ? `${service} isn't available here` : 'Add a time window'}
-        @click=${() => this._setWindows([...windows, NEW_WINDOW], 'add a time window')}
+        @click=${() => this._setWindows([...windows, newWindow(windows)], 'add a time window')}
       >
         ${plusIcon('button-icon')} Add window
       </button>
@@ -808,7 +821,8 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
 
   private _renderWindow(window: AutoWindow, index: number, disabled: boolean): TemplateResult {
     const windows = this._windows!;
-    return html`<div class="settings-window">
+    const minRun = window.min_run_hours;
+    return html`<div class="settings-window ${minRun === undefined ? '' : 'with-min-run'}">
       <label class="setting">
         <span class="setting-label">From</span>
         <input
@@ -865,6 +879,20 @@ export class NordpoolSchedulerCard extends LitElement implements LovelaceCard {
           @change=${(ev: Event) => this._editWindow(index, 'cheap_price', ev)}
         />
       </label>
+      ${minRun === undefined
+        ? nothing
+        : html`<label class="setting">
+            <span class="setting-label">Min run, h</span>
+            <input
+              type="number"
+              min="0"
+              max="24"
+              step="0.25"
+              .value=${String(minRun)}
+              ?disabled=${disabled}
+              @change=${(ev: Event) => this._editWindow(index, 'min_run_hours', ev)}
+            />
+          </label>`}
       <button
         class="icon-button settings-window-remove"
         title="Remove this window"
