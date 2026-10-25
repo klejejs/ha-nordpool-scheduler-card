@@ -20,7 +20,7 @@
   "author": "@klejejs",
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "8.0.7",
+    "@babel/core": "8.0.9",
     "@babel/preset-env": "8.0.7",
     "@eslint/js": "10.0.1",
     "@rollup/plugin-babel": "7.1.0",
