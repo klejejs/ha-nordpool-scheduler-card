@@ -43,7 +43,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "home-assistant-js-websocket": "9.7.1",
+    "home-assistant-js-websocket": "9.8.0",
     "lit": "3.3.3"
   }
 }
